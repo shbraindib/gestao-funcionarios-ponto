@@ -6,6 +6,18 @@ const corsHeaders={
   'Access-Control-Allow-Methods':'POST, OPTIONS'
 }
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...corsHeaders,'Content-Type':'application/json'}})
+const errorText=(value:unknown):string=>{
+  if(value instanceof Error)return errorText(value.message)
+  if(typeof value==='string'&&value.trim()&&value.trim()!=='[object Object]')return value.trim()
+  if(value&&typeof value==='object'){
+    const record=value as Record<string,unknown>
+    for(const key of ['message','msg','error_description','details','hint','error']){
+      const text=errorText(record[key])
+      if(text)return text
+    }
+  }
+  return 'Não foi possível concluir a operação administrativa.'
+}
 
 Deno.serve(async(req)=>{
   if(req.method==='OPTIONS')return new Response('ok',{headers:corsHeaders})
@@ -39,7 +51,7 @@ Deno.serve(async(req)=>{
       const {data:created,error:createError}=await admin.auth.admin.createUser({email:body.email,password:body.password,email_confirm:true,user_metadata:{full_name:body.full_name}})
       if(createError)throw createError
       const uid=created.user.id
-      const {error:profileError}=await admin.from('profiles').insert({id:uid,full_name:body.full_name,system_role:'user',active:body.active!==false})
+      const {error:profileError}=await admin.from('profiles').upsert({id:uid,full_name:body.full_name,system_role:'user',active:body.active!==false},{onConflict:'id'})
       if(profileError){await admin.auth.admin.deleteUser(uid);throw profileError}
       const {error:membershipError}=await admin.from('memberships').insert({user_id:uid,school_id:body.school_id,role:body.role||'operator',active:true})
       if(membershipError){await admin.from('profiles').delete().eq('id',uid);await admin.auth.admin.deleteUser(uid);throw membershipError}
@@ -73,5 +85,5 @@ Deno.serve(async(req)=>{
       return reply({ok:true})
     }
     return reply({error:'Ação não reconhecida.'},400)
-  }catch(error){console.error(error);return reply({error:error instanceof Error?error.message:String(error)},400)}
+  }catch(error){console.error(error);return reply({error:errorText(error)},400)}
 })
