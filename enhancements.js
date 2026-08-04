@@ -90,6 +90,52 @@
     return toast;
   }
 
+  function setupActionTooltips() {
+    const tooltip = document.createElement("div");
+    tooltip.className = "action-tooltip";
+    tooltip.setAttribute("role", "tooltip");
+    tooltip.hidden = true;
+    document.body.appendChild(tooltip);
+    let current = null;
+    const hide = () => {
+      current = null;
+      tooltip.hidden = true;
+    };
+    const show = (button) => {
+      const message = button?.dataset.tooltip;
+      if (!message) return;
+      current = button;
+      tooltip.textContent = message;
+      tooltip.hidden = false;
+      requestAnimationFrame(() => {
+        if (current !== button) return;
+        const rect = button.getBoundingClientRect();
+        const top = Math.max(8, rect.top - tooltip.offsetHeight - 9);
+        const left = Math.min(
+          window.innerWidth - tooltip.offsetWidth - 8,
+          Math.max(8, rect.left + rect.width / 2 - tooltip.offsetWidth / 2),
+        );
+        tooltip.style.top = `${top}px`;
+        tooltip.style.left = `${left}px`;
+      });
+    };
+    document.addEventListener("mouseover", (event) =>
+      show(event.target.closest?.("[data-tooltip]")),
+    );
+    document.addEventListener("mouseout", (event) => {
+      const button = event.target.closest?.("[data-tooltip]");
+      if (button && !button.contains(event.relatedTarget)) hide();
+    });
+    document.addEventListener("focusin", (event) =>
+      show(event.target.closest?.("[data-tooltip]")),
+    );
+    document.addEventListener("focusout", (event) => {
+      if (event.target.closest?.("[data-tooltip]")) hide();
+    });
+    window.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
+  }
+
   function openDialog({
     title,
     message = "",
@@ -731,12 +777,25 @@
       remove.removeAttribute("onclick");
       remove.className = `mini-btn ${active ? "archive" : "restore"}`;
       remove.textContent = active ? "Arquivar" : "Reativar";
+      remove.dataset.tooltip = active
+        ? "Arquiva o cadastro sem apagá-lo. Ele permanece no histórico e pode ser reativado."
+        : "Reativa o cadastro e volta a incluí-lo nas seleções e emissões.";
+      remove.setAttribute(
+        "aria-label",
+        `${remove.textContent} ${person?.nome || labels[type].one}. ${remove.dataset.tooltip}`,
+      );
       remove.addEventListener("click", () => archivePerson(type, id));
       if (window.gfpOnline?.canPermanentlyDelete?.()) {
         const permanent = document.createElement("button");
         permanent.type = "button";
         permanent.className = "mini-btn permanent";
         permanent.textContent = "Excluir definitivamente";
+        permanent.dataset.tooltip =
+          "Exclui permanentemente o cadastro e os dados relacionados. Esta ação não pode ser desfeita.";
+        permanent.setAttribute(
+          "aria-label",
+          `Excluir definitivamente ${person?.nome || labels[type].one}. ${permanent.dataset.tooltip}`,
+        );
         permanent.addEventListener("click", () =>
           permanentlyDeletePerson(type, id),
         );
@@ -789,6 +848,7 @@
 
   setupRegistry("employee");
   setupRegistry("teacher");
+  setupActionTooltips();
   renderRegistryList("employee");
   renderRegistryList("teacher");
   Object.assign(window.GFP_APP, {

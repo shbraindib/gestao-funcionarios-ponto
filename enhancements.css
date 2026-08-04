@@ -70,6 +70,21 @@
   line-height: 1;
 }
 
+.action-tooltip {
+  position: fixed;
+  z-index: 14000;
+  width: max-content;
+  max-width: min(330px, calc(100vw - 24px));
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: #101828;
+  color: #fff;
+  box-shadow: 0 7px 18px #10182833;
+  font-size: 11px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
 .dialog-backdrop,
 .registry-backdrop {
   position: fixed;

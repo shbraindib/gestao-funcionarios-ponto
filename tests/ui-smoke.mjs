@@ -120,6 +120,22 @@ assert.equal(
   true,
   "administradores devem ver a exclusão definitiva",
 );
+const archiveButton = employeeSection.querySelector(".mini-btn.archive");
+const permanentButton = employeeSection.querySelector(".mini-btn.permanent");
+assert.match(archiveButton.dataset.tooltip, /permanece no histórico/i);
+assert.match(permanentButton.dataset.tooltip, /não pode ser desfeita/i);
+assert.match(archiveButton.getAttribute("aria-label"), /Arquivar Teste Um/i);
+archiveButton.dispatchEvent(
+  new window.FocusEvent("focusin", { bubbles: true }),
+);
+assert.match(
+  window.document.querySelector(".action-tooltip").textContent,
+  /permanece no histórico/i,
+  "a explicação deve aparecer ao passar o mouse ou focar o botão",
+);
+archiveButton.dispatchEvent(
+  new window.FocusEvent("focusout", { bubbles: true }),
+);
 
 employeeSection.querySelector(".registry-toolbar .btn").click();
 employeeForm.elements.nome.value = "Teste Dois";
