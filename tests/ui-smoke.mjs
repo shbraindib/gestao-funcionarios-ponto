@@ -64,6 +64,7 @@ assert.equal(
 employeeForm.elements.nome.value = "Teste Um";
 employeeForm.elements.cargo.value = "Auxiliar";
 employeeForm.elements.matricula.value = "MAT-001";
+employeeForm.elements.nascimento.value = "2000-08-01";
 employeeForm.dispatchEvent(
   new window.Event("submit", { bubbles: true, cancelable: true }),
 );
@@ -127,6 +128,65 @@ assert.equal(
     ?.textContent.includes("[object Object]"),
   false,
   "erros em objeto devem ser convertidos em texto legível",
+);
+
+assert.doesNotMatch(
+  html,
+  /\.view\{display:block!important\}/,
+  "a impressão não pode tornar todas as telas visíveis",
+);
+assert.match(
+  html,
+  /body\.print-points #view-gerar[\s\S]*body\.print-frequency #view-frequencia/,
+  "cada modo de impressão deve exibir somente a sua própria tela",
+);
+
+window.showView("gerar");
+window.document.getElementById("genType").value = "employee";
+window.document.getElementById("genMonth").value = "8";
+window.document.getElementById("genYear").value = "2026";
+window.renderSelection();
+window.generatePreview();
+assert.equal(window.document.body.classList.contains("print-points"), true);
+assert.equal(
+  window.document.querySelectorAll("#printArea .sheet").length > 0,
+  true,
+);
+
+window.generateSectorReport();
+assert.equal(window.document.body.classList.contains("print-sector"), true);
+assert.equal(
+  window.document.querySelectorAll("#reportPrintArea .sector-report").length >
+    0,
+  true,
+);
+
+window.document.getElementById("birthdayMonth").value = "8";
+window.generateBirthdayReport();
+assert.equal(window.document.body.classList.contains("print-birthday"), true);
+assert.equal(
+  window.document.querySelectorAll("#reportPrintArea .birthday-report").length >
+    0,
+  true,
+);
+
+window.printCompleteRegistry("employee");
+assert.equal(window.document.body.classList.contains("print-registry"), true);
+assert.equal(
+  window.document.querySelectorAll("#reportPrintArea .registry-report").length >
+    0,
+  true,
+);
+
+window.document.getElementById("frequencyStart").value = "2026-08-01";
+window.document.getElementById("frequencyEnd").value = "2026-08-31";
+window.document.getElementById("frequencyIssueDate").value = "2026-08-31";
+window.generateFrequencyReport();
+assert.equal(window.document.body.classList.contains("print-frequency"), true);
+assert.equal(
+  window.document.querySelectorAll("#frequencyPrintArea .frequency-sheet")
+    .length > 0,
+  true,
 );
 
 console.log("UI smoke test passed");
