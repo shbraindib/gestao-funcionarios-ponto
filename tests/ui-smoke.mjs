@@ -16,6 +16,7 @@ const enhancementCss = await fs.readFile(
   path.join(project, "enhancements.css"),
   "utf8",
 );
+const onlineJs = await fs.readFile(path.join(project, "online.js"), "utf8");
 const window = new Window({ url: "https://local.test/" });
 window.document.write(html.replace(/<script[\s\S]*?<\/script>/gi, ""));
 window.structuredClone = globalThis.structuredClone;
@@ -352,5 +353,15 @@ assert.match(adminFunction, /body\.action === 'export_system_backup'/);
 assert.match(adminFunction, /body\.action === 'restore_system_backup'/);
 assert.match(adminFunction, /profile\.system_role !== 'master'/);
 assert.match(adminFunction, /includes_passwords:\s*false/);
+assert.match(
+  onlineJs,
+  /location\.origin\s*\+\s*location\.pathname/,
+  "a recuperaÃ§Ã£o de senha deve preservar o caminho do app no GitHub Pages",
+);
+assert.doesNotMatch(
+  onlineJs,
+  /redirect_to="\s*\+\s*encodeURIComponent\(location\.origin\)/,
+  "a recuperaÃ§Ã£o de senha nÃ£o pode usar apenas o domÃ­nio do GitHub Pages",
+);
 
 console.log("UI smoke test passed");

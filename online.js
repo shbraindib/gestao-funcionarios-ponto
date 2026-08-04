@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   const cfg = window.GFP_CONFIG || {};
-  const runtimeVersion = "20260804-10";
+  const runtimeVersion = "20260804-11";
   const state = {
     accessToken: "",
     refreshToken: "",
@@ -186,11 +186,14 @@
     clearSession();
     location.reload();
   }
+  function recoveryRedirectUrl() {
+    return location.origin + location.pathname;
+  }
   async function resetPassword() {
     const email = await window.GFP_APP?.promptEmail?.();
     if (!email) return;
     await request(
-      "/auth/v1/recover?redirect_to=" + encodeURIComponent(location.origin),
+      "/auth/v1/recover?redirect_to=" + encodeURIComponent(recoveryRedirectUrl()),
       { method: "POST", body: { email }, auth: false },
     );
     notify(
