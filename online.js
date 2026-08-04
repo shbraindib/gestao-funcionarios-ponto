@@ -1,7 +1,7 @@
 (function () {
   "use strict";
   const cfg = window.GFP_CONFIG || {};
-  const runtimeVersion = "20260804-9";
+  const runtimeVersion = "20260804-10";
   const state = {
     accessToken: "",
     refreshToken: "",
@@ -757,6 +757,11 @@
             ? ""
             : "none";
     });
+    const masterSystemBackup = el("masterSystemBackup");
+    if (masterSystemBackup)
+      masterSystemBackup.hidden = !(
+        state.profile?.system_role === "master" && !state.preview
+      );
     window.GFP_APP.refreshStorageInfo();
     window.GFP_APP.refreshDashboard?.();
   }
@@ -1056,6 +1061,174 @@
   async function adminCall(body) {
     await ensureToken();
     return request("/functions/v1/admin-users", { method: "POST", body });
+  }
+  function systemBackupTimestamp() {
+    return new Date().toISOString().replace(/[:.]/g, "-");
+  }
+  function downloadJsonFile(value, filename) {
+    const blob = new Blob([JSON.stringify(value, null, 2)], {
+        type: "application/json;charset=utf-8",
+      }),
+      link = document.createElement("a"),
+      url = URL.createObjectURL(blob);
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+  function validateSystemBackupFile(backup) {
+    if (!backup || typeof backup !== "object")
+      throw new Error("O arquivo selecionado não contém um backup válido.");
+    if (backup.format !== "gestao-funcionarios-ponto/system-backup")
+      throw new Error("Este arquivo não é um backup geral deste sistema.");
+    if (Number(backup.version) !== 1)
+      throw new Error("A versão deste backup geral não é compatível.");
+    for (const field of ["schools", "school_data", "users", "memberships"])
+      if (!Array.isArray(backup[field]))
+        throw new Error(`O backup está incompleto: campo ${field} ausente.`);
+    if (!backup.schools.length)
+      throw new Error("O backup geral não contém nenhuma escola.");
+    return backup;
+  }
+  function clearSystemRestoreLocalState() {
+    clearTimeout(state.saveTimer);
+    state.pendingPayload = null;
+    state.pendingBaseVersion = null;
+    state.conflict = false;
+    state.ready = false;
+    try {
+      const keys = [];
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index) || "";
+        if (
+          key.startsWith("gfp_school_cache_") ||
+          key.startsWith("gfp_pending_save_")
+        )
+          keys.push(key);
+      }
+      keys.forEach((key) => localStorage.removeItem(key));
+    } catch {}
+  }
+  async function requestSystemBackup() {
+    const result = await adminCall({
+      action: "export_system_backup",
+      app_version: window.GFP_APP?.version || "2.0 Online",
+    });
+    return validateSystemBackupFile(result?.backup);
+  }
+  async function exportSystemBackup() {
+    if (state.profile?.system_role !== "master" || state.preview) return;
+    const button = el("exportSystemBackupBtn"),
+      originalLabel = button.textContent;
+    if (button.disabled) return;
+    button.disabled = true;
+    button.textContent = "Gerando backup…";
+    message("systemBackupMessage", "Reunindo todas as escolas e usuários...");
+    try {
+      const backup = await requestSystemBackup();
+      downloadJsonFile(
+        backup,
+        `backup_geral_gestao_ponto_${systemBackupTimestamp()}.json`,
+      );
+      message(
+        "systemBackupMessage",
+        `Backup geral exportado: ${backup.schools.length} escola(s), ${backup.users.length} usuário(s) e ${backup.memberships.length} vínculo(s).`,
+        "ok",
+      );
+      notify("Backup geral exportado com sucesso.", "success");
+    } catch (error) {
+      message("systemBackupMessage", errorText(error), "error");
+      notify(error, "error");
+    } finally {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  }
+  async function restoreSystemBackup(event) {
+    const input = event.target,
+      file = input.files?.[0];
+    if (!file) return;
+    if (state.profile?.system_role !== "master" || state.preview) {
+      input.value = "";
+      return;
+    }
+    const label = el("restoreSystemBackupLabel"),
+      originalLabel = label.firstChild?.textContent || "Restaurar backup geral";
+    try {
+      if (file.size > 15 * 1024 * 1024)
+        throw new Error("O arquivo excede o limite de 15 MB.");
+      let backup;
+      try {
+        backup = JSON.parse(await file.text());
+      } catch {
+        throw new Error("O arquivo selecionado não contém um JSON válido.");
+      }
+      validateSystemBackupFile(backup);
+      const confirmed = await window.GFP_APP?.promptTypedConfirmation?.({
+        title: "Restaurar o sistema inteiro?",
+        message: `O arquivo contém ${backup.schools.length} escola(s), ${backup.users.length} usuário(s) e ${backup.memberships.length} vínculo(s).`,
+        detail:
+          "Escolas, dados e vínculos atuais serão substituídos. Uma cópia automática do estado atual será baixada antes da alteração. Senhas e credenciais de login não serão modificadas.",
+        expected: "RESTAURAR SISTEMA",
+        label: "Digite RESTAURAR SISTEMA para confirmar",
+      });
+      if (!confirmed) return;
+      input.disabled = true;
+      label.style.pointerEvents = "none";
+      label.style.opacity = ".65";
+      if (label.firstChild) label.firstChild.textContent = "Restaurando…";
+      message(
+        "systemBackupMessage",
+        "Criando a cópia automática de segurança...",
+      );
+      const currentBackup = await requestSystemBackup();
+      downloadJsonFile(
+        currentBackup,
+        `backup_automatico_antes_restauracao_${systemBackupTimestamp()}.json`,
+      );
+      message("systemBackupMessage", "Restaurando os dados do sistema...");
+      const result = await adminCall({
+        action: "restore_system_backup",
+        backup,
+        mode: "replace",
+      });
+      const previousSchoolId = state.schoolId;
+      clearSystemRestoreLocalState();
+      await loadIdentity();
+      state.schoolId = "";
+      state.actualSchoolId = "";
+      populateSchoolSelector();
+      await refreshAdmin();
+      const target =
+        state.schools.find((school) => school.id === previousSchoolId) ||
+        state.schools[0];
+      if (target) await loadSchool(target.id);
+      applyUI();
+      const missingCount = result?.missing_users?.length || 0,
+        summary = `Restauração concluída: ${result.schools_restored} escola(s), ${result.data_restored} conjunto(s) de dados e ${result.memberships_restored} vínculo(s).`;
+      message(
+        "systemBackupMessage",
+        `${summary}${missingCount ? ` ${missingCount} usuário(s) do arquivo não possuem login atual e foram ignorados.` : ""}`,
+        missingCount ? "" : "ok",
+      );
+      notify(
+        missingCount
+          ? `${summary} Revise os usuários que não puderam ser vinculados.`
+          : summary,
+        missingCount ? "warning" : "success",
+      );
+    } catch (error) {
+      message("systemBackupMessage", errorText(error), "error");
+      notify(error, "error", { sticky: true });
+    } finally {
+      input.disabled = false;
+      input.value = "";
+      label.style.pointerEvents = "";
+      label.style.opacity = "";
+      if (label.firstChild) label.firstChild.textContent = originalLabel;
+    }
   }
   function resetUserForm() {
     const form = el("userAdminForm");
@@ -1359,6 +1532,8 @@
       message("userAdminMessage", "");
     });
     el("membershipAdminForm").addEventListener("submit", addMembership);
+    el("exportSystemBackupBtn")?.addEventListener("click", exportSystemBackup);
+    el("systemBackupFile")?.addEventListener("change", restoreSystemBackup);
     el("exitPreviewBtn").addEventListener("click", exitPreview);
     document.addEventListener("submit", blockPreviewMutations, true);
     document.addEventListener("click", blockPreviewMutations, true);

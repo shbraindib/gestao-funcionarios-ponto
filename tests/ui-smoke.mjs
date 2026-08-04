@@ -274,4 +274,31 @@ assert.equal(
   true,
 );
 
+const systemBackupCard = window.document.getElementById("masterSystemBackup");
+assert.ok(systemBackupCard, "deve existir uma área de backup geral");
+assert.equal(
+  systemBackupCard.hidden,
+  true,
+  "o backup geral deve começar oculto até a validação do usuário mestre",
+);
+assert.ok(
+  systemBackupCard.querySelector("#exportSystemBackupBtn"),
+  "o usuário mestre deve poder exportar o backup geral",
+);
+assert.ok(
+  systemBackupCard.querySelector("#systemBackupFile"),
+  "o usuário mestre deve poder selecionar um backup geral para restaurar",
+);
+assert.match(systemBackupCard.textContent, /senhas nunca entram no arquivo/i);
+assert.match(systemBackupCard.textContent, /RESTAURAR SISTEMA/);
+
+const adminFunction = await fs.readFile(
+  path.join(project, "supabase/functions/admin-users/index.ts"),
+  "utf8",
+);
+assert.match(adminFunction, /body\.action === 'export_system_backup'/);
+assert.match(adminFunction, /body\.action === 'restore_system_backup'/);
+assert.match(adminFunction, /profile\.system_role !== 'master'/);
+assert.match(adminFunction, /includes_passwords:\s*false/);
+
 console.log("UI smoke test passed");
