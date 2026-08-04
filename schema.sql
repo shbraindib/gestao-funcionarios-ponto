@@ -36,7 +36,9 @@ create table if not exists public.school_data (
   school_id uuid primary key references public.schools(id) on delete cascade,
   payload jsonb not null default '{}'::jsonb,
   updated_at timestamptz not null default now(),
-  updated_by uuid references auth.users(id) on delete set null
+  updated_by uuid references auth.users(id) on delete set null,
+  updated_by_name text,
+  version bigint not null default 1
 );
 
 create table if not exists public.audit_logs (
@@ -57,8 +59,18 @@ drop trigger if exists profiles_touch on public.profiles;
 create trigger profiles_touch before update on public.profiles for each row execute function public.touch_updated_at();
 drop trigger if exists schools_touch on public.schools;
 create trigger schools_touch before update on public.schools for each row execute function public.touch_updated_at();
+create or replace function public.touch_school_data()
+returns trigger language plpgsql security invoker set search_path='' as $$
+begin
+  new.updated_at=now();
+  new.updated_by=(select auth.uid());
+  select p.full_name into new.updated_by_name from public.profiles p where p.id=(select auth.uid());
+  if tg_op='UPDATE' then new.version=old.version+1; else new.version=coalesce(new.version,1); end if;
+  return new;
+end; $$;
+
 drop trigger if exists school_data_touch on public.school_data;
-create trigger school_data_touch before update on public.school_data for each row execute function public.touch_updated_at();
+create trigger school_data_touch before insert or update on public.school_data for each row execute function public.touch_school_data();
 
 create or replace function public.is_system_master()
 returns boolean language sql stable security definer set search_path=public as $$
@@ -105,8 +117,10 @@ create policy audit_select on public.audit_logs for select to authenticated usin
 
 revoke all on function public.is_system_master() from public;
 revoke all on function public.has_school_role(uuid,text[]) from public;
+revoke all on function public.touch_school_data() from public;
 grant execute on function public.is_system_master() to authenticated;
 grant execute on function public.has_school_role(uuid,text[]) to authenticated;
+grant execute on function public.touch_school_data() to authenticated;
 
 grant select,insert,update,delete on public.profiles,public.schools,public.memberships,public.school_data,public.audit_logs to authenticated;
 grant usage,select on sequence public.audit_logs_id_seq to authenticated;

@@ -9,6 +9,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="app-icon-192.png">
 <link rel="apple-touch-icon" href="app-icon-192.png">
 <link rel="manifest" href="manifest.webmanifest?v=20260804-1">
+<link rel="stylesheet" href="enhancements.css?v=20260804-9">
 <style>
 :root{--bg:#eef2f7;--card:#fff;--ink:#172033;--muted:#667085;--line:#cbd5e1;--accent:#1f5fae;--accent2:#16467f;--danger:#b42318;--ok:#157347}
 *{box-sizing:border-box}
@@ -117,6 +118,7 @@ body.preview-readonly #view-config .actions,body.preview-readonly #view-funciona
   <button id="mobileMenuButton" class="mobile-menu-button" type="button" aria-controls="appNav" aria-expanded="false"><span class="mobile-menu-icon" aria-hidden="true">☰</span> Menu</button>
   <label>Unidade <select id="schoolSelector"></select></label>
   <span id="cloudStatus" class="cloud-status">Aguardando sincronização...</span>
+  <button id="cloudRetryButton" class="cloud-retry" type="button" hidden>Tentar novamente</button>
   <span class="session-spacer"></span>
   <span id="sessionUser" class="session-user"></span>
   <span id="sessionRole" class="role-badge"></span>
@@ -251,7 +253,7 @@ function columnLabel(type,key){return listColumnDefs[type].find(c=>c[0]===key)?.
 function registryControlsHtml(type,keepPickerOpen=false){const p=registryPrefs(type),defs=listColumnDefs[type];const checks=defs.map(([key,title])=>`<label><input type="checkbox" ${p.visible.includes(key)?'checked':''} onchange="toggleListColumn('${type}','${key}',this.checked)"><span>${esc(title)}</span></label>`).join('');const printChecks=registryPrintFields[type].map(([key,title])=>`<label><input type="checkbox" ${p.printVisible.includes(key)?'checked':''} ${key==='nome'?'disabled':''} onchange="toggleRegistryPrintField('${type}','${key}',this.checked)"><span>${esc(title)}${key==='nome'?' (obrigatório)':''}</span></label>`).join('');const sizes=[[5,'5'],[10,'10'],[15,'15'],[25,'25'],[50,'50'],[0,'Todos']].map(([v,l])=>`<option value="${v}" ${p.pageSize===v?'selected':''}>${l}</option>`).join('');return `<div class="registry-list-controls"><details class="column-picker" ${keepPickerOpen?'open':''}><summary>Campos exibidos (${p.visible.length})</summary><div class="column-menu">${checks}<div class="registry-fields-note">A coluna Ações permanece visível para edição.</div></div></details><details class="column-picker"><summary>Campos do relatório (${p.printVisible.length})</summary><div class="column-menu">${printChecks}<div class="registry-fields-note">Define os dados do relatório "Cadastro completo".</div></div></details><div class="page-size-box"><button class="step-btn" type="button" title="Diminuir quantidade" onclick="stepPageSize('${type}',-1)">−</button><label>Exibir por página <select onchange="setPageSize('${type}',this.value)">${sizes}</select></label><button class="step-btn" type="button" title="Aumentar quantidade" onclick="stepPageSize('${type}',1)">+</button></div><button class="btn light compact" type="button" onclick="openRegistryNotes('${type}')">Observações da impressão</button><button class="btn secondary compact" type="button" onclick="printCompleteRegistry('${type}')">Imprimir cadastro completo</button></div>`}
 function toggleRegistryPrintField(type,key,checked){const p=registryPrefs(type);if(key==='nome')return;if(checked&&!p.printVisible.includes(key))p.printVisible.push(key);if(!checked)p.printVisible=p.printVisible.filter(k=>k!==key);persistListPrefs();renderRegistryList(type)}
 function registryTableHtml(type,keepPickerOpen=false){const p=registryPrefs(type),all=sortedRegistryItems(type),pageSize=p.pageSize||Math.max(1,all.length),totalPages=p.pageSize===0?1:Math.max(1,Math.ceil(all.length/pageSize));if(p.page>totalPages)p.page=totalPages;const start=p.pageSize===0?0:(p.page-1)*pageSize,items=p.pageSize===0?all:all.slice(start,start+pageSize),cols=listColumnDefs[type].filter(c=>p.visible.includes(c[0]));const controls=registryControlsHtml(type,keepPickerOpen);const meta=`<div class="registry-list-meta"><span>${all.length?`${start+1} a ${start+items.length} de ${all.length}`:'Nenhum cadastro'}</span><span>•</span><span>Ordenado por <strong>${esc(columnLabel(type,p.sortKey))}</strong> (${p.sortDir==='asc'?'crescente':'decrescente'})</span><span class="spacer"></span><span>Clique em um título para ordenar.</span></div>`;if(!all.length)return controls+meta+'<div class="empty">Nenhum cadastro.</div>';const head=cols.map(([key,title])=>`<th><button class="sort-btn" onclick="sortRegistryList('${type}','${key}')">${esc(title)}${p.sortKey===key?`<span class="sort-mark">${p.sortDir==='asc'?'▲':'▼'}</span>`:''}</button></th>`).join('');const body=items.map(x=>`<tr>${cols.map(c=>`<td>${displayCell(x,c[0])}</td>`).join('')}<td><button class="mini-btn edit" onclick="editItem('${type}','${x.id}')">Editar</button> <button class="mini-btn del" onclick="deleteItem('${type}','${x.id}')">Excluir</button></td></tr>`).join('');const pagination=totalPages>1?`<div class="registry-pagination"><button type="button" ${p.page<=1?'disabled':''} onclick="changeListPage('${type}',-1)">Anterior</button><span>Página ${p.page} de ${totalPages}</span><button type="button" ${p.page>=totalPages?'disabled':''} onclick="changeListPage('${type}',1)">Próxima</button></div>`:'';return controls+meta+`<div class="table-wrap"><table class="data"><thead><tr>${head}<th>Ações</th></tr></thead><tbody>${body}</tbody></table></div>`+pagination}
-function renderRegistryList(type,keepPickerOpen=false){document.getElementById(type==='employee'?'employeeTable':'teacherTable').innerHTML=registryTableHtml(type,keepPickerOpen);persistListPrefs()}
+function renderRegistryList(type,keepPickerOpen=false){document.getElementById(type==='employee'?'employeeTable':'teacherTable').innerHTML=registryTableHtml(type,keepPickerOpen)}
 function toggleListColumn(type,key,checked){const p=registryPrefs(type);if(checked&&!p.visible.includes(key))p.visible.push(key);if(!checked){if(p.visible.length===1){alert('Mantenha pelo menos um campo visível.');renderRegistryList(type,true);return}p.visible=p.visible.filter(k=>k!==key)}p.page=1;renderRegistryList(type,true)}
 function sortRegistryList(type,key){const p=registryPrefs(type);if(p.sortKey===key)p.sortDir=p.sortDir==='asc'?'desc':'asc';else{p.sortKey=key;p.sortDir='asc'}p.page=1;renderRegistryList(type)}
 function setPageSize(type,value){const p=registryPrefs(type);p.pageSize=Number(value);p.page=1;renderRegistryList(type)}
@@ -265,7 +267,7 @@ function renderDashboard(){const host=document.getElementById('homeDashboard');i
 function renderAll(){fillConfig();renderRegistryList('employee');renderRegistryList('teacher');renderReportFieldPickers();renderReportSectorPicker();const events=[...data.events].sort((a,b)=>a.date.localeCompare(b.date));document.getElementById('eventTable').innerHTML=tableHtml(events,[['date','Data'],['tipo','Tipo'],['descricao','Descrição'],['rotulo','Rótulo']],'event');renderAbsenceOptions();renderAbsenceFilters();document.getElementById('absenceTable').innerHTML=absenceTableHtml();renderSelection();renderDashboard()}
 ['absenceSearch','absenceTypeFilter','absenceYearFilter'].forEach(id=>document.getElementById(id)?.addEventListener(id==='absenceSearch'?'input':'change',()=>{document.getElementById('absenceTable').innerHTML=absenceTableHtml()}));
 function editItem(type,id){if(type==='absence'){setForm('absenceForm',data.absences.find(x=>x.id===id));showView('afastamentos');return}const map={employee:['employees','employeeForm'],teacher:['teachers','teacherForm'],event:['events','eventForm']};const [arr,form]=map[type];setForm(form,data[arr].find(x=>x.id===id));showView(type==='event'?'calendario':type==='employee'?'funcionarios':'professores')}
-function deleteItem(type,id){if(!confirm('Excluir este cadastro?'))return;if(type==='absence'){data.absences=data.absences.filter(x=>x.id!==id);saveData();return}const map={employee:'employees',teacher:'teachers',event:'events'};data[map[type]]=data[map[type]].filter(x=>x.id!==id);if(type==='employee'||type==='teacher')data.absences=data.absences.filter(a=>!(a.personType===type&&a.personId===id));saveData()}
+async function deleteItem(type,id){const ok=await window.GFP_APP.confirmAction({title:'Excluir este cadastro?',message:'O registro será removido permanentemente.',confirmLabel:'Excluir',danger:true});if(!ok)return;if(type==='absence'){data.absences=data.absences.filter(x=>x.id!==id);saveData();return}const map={employee:'employees',teacher:'teachers',event:'events'};data[map[type]]=data[map[type]].filter(x=>x.id!==id);if(type==='employee'||type==='teacher')data.absences=data.absences.filter(a=>!(a.personType===type&&a.personId===id));saveData()}
 const monthSel=document.getElementById('genMonth');monthNames.forEach((m,i)=>monthSel.add(new Option(m,i+1)));const now=new Date();monthSel.value=now.getMonth()+1;document.getElementById('genYear').value=now.getFullYear();document.getElementById('genType').addEventListener('change',renderSelection);const birthdayMonth=document.getElementById('birthdayMonth');monthNames.forEach((m,i)=>birthdayMonth.add(new Option(m,i+1)));birthdayMonth.value=now.getMonth()+1;
 function renderSelection(){const box=document.getElementById('genSelection');if(!box)return;const type=document.getElementById('genType').value;let items=[];if(type==='employee'||type==='all')items.push(...data.employees.filter(isActive).map(x=>({...x,_type:'employee'})));if(type==='teacher'||type==='all')items.push(...data.teachers.filter(isActive).map(x=>({...x,_type:'teacher'})));items.sort((a,b)=>compareNames(a,b)||a._type.localeCompare(b._type));box.innerHTML=items.length?items.map(x=>{const sub=x._type==='teacher'&&isSubstitute(x);return `<div class="select-item"><input type="checkbox" ${sub?'':'checked'} data-substitute="${sub?'1':'0'}" data-id="${x.id}" data-type="${x._type}" id="sel-${x._type}-${x.id}"><label for="sel-${x._type}-${x.id}">${esc(x.nome)} <span style="color:#667085">- ${x._type==='employee'?esc(x.cargo):esc(x.disciplina)}</span>${sub?'<span class="tag-sub">SUBSTITUTO</span>':''}</label></div>`}).join(''):'<div class="empty">Nenhum servidor disponível.</div>'}
 function toggleAll(v){document.querySelectorAll('#genSelection input[type=checkbox]').forEach(x=>x.checked=v&&x.dataset.substitute!=='1')}
@@ -326,9 +328,8 @@ async function clearSchoolData(){
     await window.gfpOnline.ensureSchoolReady();
     const school=window.gfpOnline.currentSchool?.()||{};
     const schoolName=school.name||document.getElementById('schoolSelector')?.selectedOptions?.[0]?.textContent||'a unidade selecionada';
-    if(!confirm(`Esta ação apagará todos os funcionários, professores, eventos, afastamentos, ocorrências e configurações de ${schoolName}. Antes de continuar, exporte um backup. Deseja prosseguir?`))return;
-    const typed=prompt(`Para confirmar a exclusão dos dados de ${schoolName}, digite APAGAR:`,'');
-    if(typed!=='APAGAR'){alert('Operação cancelada. Nenhum dado foi alterado.');return}
+    const confirmed=await window.GFP_APP.promptTypedConfirmation({title:'Apagar todos os dados da unidade?',message:`Todos os funcionários, professores, eventos, afastamentos, ocorrências e configurações de ${schoolName} serão removidos.`,detail:'Exporte um backup antes de continuar. Esta ação não pode ser desfeita.',expected:'APAGAR',label:'Digite APAGAR para confirmar'});
+    if(!confirmed)return;
     const emptyData=window.GFP_APP.createEmptyData(school);
     await window.gfpOnline.saveNow(emptyData);
     alert(`Os dados de ${schoolName} foram apagados e a unidade vazia foi confirmada no banco online.`);
@@ -363,7 +364,7 @@ renderAll=function(){baseRenderAllV114();fillConfig();renderOccurrenceOptions();
 const baseEditItemV114=editItem;
 editItem=function(type,id){if(type==='occurrence'){setForm('occurrenceForm',data.occurrences.find(x=>x.id===id));showView('ocorrencias');return}baseEditItemV114(type,id)};
 const baseDeleteItemV114=deleteItem;
-deleteItem=function(type,id){if(type==='occurrence'){if(!confirm('Excluir esta ocorrência?'))return;data.occurrences=data.occurrences.filter(x=>x.id!==id);saveData();return}if(type==='employee'||type==='teacher')data.occurrences=data.occurrences.filter(o=>!(o.personType===type&&o.personId===id));baseDeleteItemV114(type,id)};
+deleteItem=async function(type,id){if(type==='occurrence'){const ok=await window.GFP_APP.confirmAction({title:'Excluir ocorrência?',message:'A ocorrência será removida permanentemente.',confirmLabel:'Excluir',danger:true});if(!ok)return;data.occurrences=data.occurrences.filter(x=>x.id!==id);saveData();return}baseDeleteItemV114(type,id)};
 const baseSetPrintModeV114=setPrintMode;
 setPrintMode=function(mode){if(mode!=='frequency'){document.body.classList.remove('print-frequency');baseSetPrintModeV114(mode);return}document.body.classList.remove('print-points','print-sector','print-birthday','print-registry','print-frequency');document.body.classList.add('print-frequency');document.getElementById('dynamicPrintPage').textContent='@media print{@page{size:A4 landscape;margin:0}}'};
 
@@ -463,10 +464,11 @@ window.GFP_APP={
   version:'2.0 Online'
 };
 </script>
-<script src="online.js?v=20260804-8"></script>
+<script src="enhancements.js?v=20260804-9"></script>
+<script src="online.js?v=20260804-9"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=20260804-8',{updateViaCache:'none'}).catch(() => {}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=20260804-9',{updateViaCache:'none'}).catch(() => {}));
 }
 </script>
 </body></html>

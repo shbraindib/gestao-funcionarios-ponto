@@ -1,0 +1,305 @@
+.cloud-retry {
+  border: 1px solid #f04438;
+  border-radius: 7px;
+  background: #fff;
+  color: #b42318;
+  padding: 6px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toast-region {
+  position: fixed;
+  right: 20px;
+  top: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(390px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.app-toast {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: 10px 1fr auto;
+  gap: 10px;
+  align-items: start;
+  padding: 13px 14px;
+  border: 1px solid #d0d5dd;
+  border-radius: 11px;
+  background: #fff;
+  box-shadow: 0 12px 30px #10182828;
+  color: #344054;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.app-toast:before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-top: 4px;
+  background: #2e73c5;
+}
+.app-toast.success:before {
+  background: #12b76a;
+}
+.app-toast.warning:before {
+  background: #f79009;
+}
+.app-toast.error:before {
+  background: #f04438;
+}
+.app-toast-actions {
+  display: flex;
+  gap: 5px;
+}
+.app-toast button {
+  border: 0;
+  background: transparent;
+  color: #175cd3;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 1px 3px;
+}
+.app-toast .toast-close {
+  color: #667085;
+  font-size: 17px;
+  line-height: 1;
+}
+
+.dialog-backdrop,
+.registry-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #10182878;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+.app-dialog {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 36px);
+  overflow: auto;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px #10182845;
+  padding: 22px;
+}
+.app-dialog h2 {
+  margin: 0 0 8px;
+  font-size: 19px;
+}
+.app-dialog p {
+  color: #475467;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 13px;
+}
+.app-dialog .dialog-detail {
+  padding: 11px 12px;
+  background: #fff6ed;
+  border: 1px solid #fedf89;
+  border-radius: 8px;
+  color: #93370d;
+}
+.app-dialog label {
+  margin-top: 12px;
+}
+.app-dialog .dialog-error {
+  min-height: 18px;
+  color: #b42318;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.app-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+.app-dialog .danger {
+  background: #b42318;
+}
+
+.registry-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+.registry-search {
+  position: relative;
+  flex: 1;
+  min-width: 230px;
+}
+.registry-search input {
+  margin: 0;
+  padding-left: 34px;
+}
+.registry-search:before {
+  content: "⌕";
+  position: absolute;
+  left: 11px;
+  top: 6px;
+  color: #667085;
+  font-size: 20px;
+}
+.registry-toolbar .btn {
+  white-space: nowrap;
+}
+.registry-editor-card {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9100;
+  width: min(760px, 94vw);
+  margin: 0;
+  border: 0;
+  border-radius: 16px 0 0 16px;
+  box-shadow: -18px 0 44px #10182830;
+  padding: 0;
+  overflow: auto;
+  transform: translateX(105%);
+  transition: transform 0.2s ease;
+}
+.registry-editor-card.open {
+  transform: translateX(0);
+}
+.registry-backdrop {
+  z-index: 9050;
+  display: none;
+}
+.registry-backdrop.open {
+  display: block;
+}
+.registry-editor-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px 15px;
+  background: #fff;
+  border-bottom: 1px solid #eaecf0;
+}
+.registry-editor-head h2 {
+  margin: 0 0 3px;
+}
+.registry-editor-head p {
+  margin: 0;
+  color: #667085;
+  font-size: 12px;
+}
+.registry-editor-close {
+  border: 0;
+  background: #f2f4f7;
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 20px;
+  cursor: pointer;
+  color: #475467;
+}
+.registry-editor-card form {
+  padding: 18px 22px 28px;
+}
+.registry-editor-card form > .grid {
+  display: block;
+}
+.registry-form-group {
+  border: 1px solid #e4e7ec;
+  border-radius: 10px;
+  padding: 14px;
+  margin: 0 0 14px;
+}
+.registry-form-group legend {
+  padding: 0 6px;
+  color: #16467f;
+  font-size: 13px;
+  font-weight: 800;
+}
+.registry-form-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.registry-form-fields > label:has(textarea),
+.registry-form-fields > .field-block:has(textarea) {
+  grid-column: 1/-1;
+}
+.registry-editor-card .actions {
+  position: sticky;
+  bottom: -28px;
+  background: #fff;
+  border-top: 1px solid #eaecf0;
+  padding: 14px 0 4px;
+  z-index: 2;
+}
+.field-error-text {
+  display: block;
+  margin-top: 4px;
+  color: #b42318;
+  font-size: 11px;
+  font-weight: 600;
+}
+.field-invalid input,
+.field-invalid select,
+.field-invalid textarea,
+.field-invalid .segmented {
+  border-color: #f04438;
+  box-shadow: 0 0 0 2px #f0443818;
+}
+.substitution-fields[hidden] {
+  display: none !important;
+}
+.registry-row-inactive {
+  opacity: 0.65;
+}
+.mini-btn.archive {
+  background: #fff6ed;
+  color: #b54708;
+}
+.mini-btn.restore {
+  background: #ecfdf3;
+  color: #027a48;
+}
+.mini-btn.permanent {
+  background: transparent;
+  color: #b42318;
+  text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+  .toast-region {
+    top: 12px;
+    right: 12px;
+  }
+  .registry-editor-card {
+    width: 100vw;
+    border-radius: 0;
+  }
+  .registry-form-fields {
+    grid-template-columns: 1fr;
+  }
+  .registry-editor-card form {
+    padding: 15px;
+  }
+  .registry-editor-head {
+    padding: 16px;
+  }
+  .registry-toolbar {
+    align-items: stretch;
+  }
+  .registry-toolbar .btn {
+    width: 100%;
+  }
+}

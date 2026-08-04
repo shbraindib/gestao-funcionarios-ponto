@@ -1,0 +1,10 @@
+{
+  "name": "gestao-funcionarios-ponto",
+  "private": true,
+  "scripts": {
+    "test": "node tests/ui-smoke.mjs"
+  },
+  "devDependencies": {
+    "happy-dom": "20.11.1"
+  }
+}
