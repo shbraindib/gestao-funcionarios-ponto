@@ -12,6 +12,10 @@ const enhancements = await fs.readFile(
   path.join(project, "enhancements.js"),
   "utf8",
 );
+const enhancementCss = await fs.readFile(
+  path.join(project, "enhancements.css"),
+  "utf8",
+);
 const window = new Window({ url: "https://local.test/" });
 window.document.write(html.replace(/<script[\s\S]*?<\/script>/gi, ""));
 window.structuredClone = globalThis.structuredClone;
@@ -61,6 +65,36 @@ assert.equal(
   7,
   "o formulário deve estar dividido em sete blocos",
 );
+for (const [name, count] of [
+  ["docTipo", 2],
+  ["plantao", 2],
+  ["estudante", 2],
+  ["status", 2],
+]) {
+  assert.equal(
+    employeeForm.querySelectorAll(`.registry-form-group input[name="${name}"]`)
+      .length,
+    count,
+    `todas as opções de ${name} devem permanecer juntas dentro do bloco correto`,
+  );
+}
+assert.equal(
+  employeeForm.querySelectorAll(":scope > .grid > .field-block").length,
+  0,
+  "nenhum seletor segmentado pode ficar solto no topo do formulário",
+);
+employeeForm.querySelector('input[name="docTipo"][value="CPF"]').click();
+employeeForm.querySelector('input[name="plantao"][value="Sim"]').click();
+employeeForm.querySelector('input[name="estudante"][value="Sim"]').click();
+employeeForm.querySelector('input[name="status"][value="Inativo"]').click();
+assert.equal(window.formObj(employeeForm).docTipo, "CPF");
+assert.equal(window.formObj(employeeForm).plantao, "Sim");
+assert.equal(window.formObj(employeeForm).estudante, "Sim");
+assert.equal(window.formObj(employeeForm).status, "Inativo");
+employeeForm.querySelector('input[name="docTipo"][value="RG"]').click();
+employeeForm.querySelector('input[name="plantao"][value="Não"]').click();
+employeeForm.querySelector('input[name="estudante"][value="Não"]').click();
+employeeForm.querySelector('input[name="status"][value="Ativo"]').click();
 employeeForm.elements.nome.value = "Teste Um";
 employeeForm.elements.cargo.value = "Auxiliar";
 employeeForm.elements.matricula.value = "MAT-001";
@@ -91,6 +125,9 @@ employeeSection.querySelector(".registry-toolbar .btn").click();
 employeeForm.elements.nome.value = "Teste Dois";
 employeeForm.elements.cargo.value = "Auxiliar";
 employeeForm.elements.matricula.value = "MAT-001";
+employeeForm.elements.matricula.dispatchEvent(
+  new window.Event("input", { bubbles: true }),
+);
 employeeForm.dispatchEvent(
   new window.Event("submit", { bubbles: true, cancelable: true }),
 );
@@ -99,6 +136,38 @@ assert.match(
   employeeForm.querySelector(".field-error-text")?.textContent || "",
   /matrícula já pertence/i,
   "a matrícula duplicada deve ser indicada ao lado do campo",
+);
+employeeForm
+  .closest(".registry-editor-card")
+  .querySelector(".registry-editor-close")
+  .click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(
+  window.document.querySelectorAll(".dialog-backdrop").length,
+  1,
+  "a confirmação deve abrir acima do painel quando houver alterações não salvas",
+);
+assert.match(enhancementCss, /\.dialog-backdrop\s*\{[^}]*z-index:\s*12000/s);
+assert.match(enhancementCss, /\.registry-backdrop\s*\{[^}]*z-index:\s*9050/s);
+window.document.querySelector(".dialog-cancel").click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(window.document.querySelectorAll(".dialog-backdrop").length, 0);
+assert.equal(
+  employeeForm.closest(".registry-editor-card").classList.contains("open"),
+  true,
+  "cancelar a confirmação deve manter o cadastro aberto",
+);
+employeeForm
+  .closest(".registry-editor-card")
+  .querySelector(".registry-editor-close")
+  .click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+window.document.querySelector(".dialog-confirm").click();
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(
+  employeeForm.closest(".registry-editor-card").classList.contains("open"),
+  false,
+  "confirmar o descarte deve fechar o cadastro sem bloquear a tela",
 );
 
 const teacherForm = window.document.getElementById("teacherForm");

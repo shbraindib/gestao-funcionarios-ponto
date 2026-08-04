@@ -13,7 +13,7 @@
   position: fixed;
   right: 20px;
   top: 20px;
-  z-index: 10000;
+  z-index: 13000;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -75,11 +75,13 @@
   position: fixed;
   inset: 0;
   background: #10182878;
-  z-index: 9000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 18px;
+}
+.dialog-backdrop {
+  z-index: 12000;
 }
 .app-dialog {
   width: min(520px, 100%);

@@ -248,8 +248,8 @@
   }
   function fieldContainer(form, name) {
     const control = form.elements[name];
-    const node = control instanceof RadioNodeList ? control[0] : control;
-    return node?.closest("label,.field-block") || null;
+    const node = control instanceof Element ? control : control?.[0];
+    return node?.closest(".field-block") || node?.closest("label") || null;
   }
   function addFieldError(form, name, message) {
     const container = fieldContainer(form, name);

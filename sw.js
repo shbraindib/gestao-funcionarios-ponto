@@ -1,5 +1,5 @@
-const CACHE='gfp-online-v2-14';
-const ASSETS=['./','./index.html','./config.js','./enhancements.css?v=20260804-9','./enhancements.js?v=20260804-9','./online.js?v=20260804-9','./manifest.webmanifest?v=20260804-1','./app-icon-192.png','./app-icon-512.png'];
+const CACHE='gfp-online-v2-15';
+const ASSETS=['./','./index.html','./config.js','./enhancements.css?v=20260804-11','./enhancements.js?v=20260804-11','./online.js?v=20260804-9','./manifest.webmanifest?v=20260804-1','./app-icon-192.png','./app-icon-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.hostname.endsWith('.supabase.co'))return;e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html'))))});
