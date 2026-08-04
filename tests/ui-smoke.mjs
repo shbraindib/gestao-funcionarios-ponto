@@ -137,6 +137,38 @@ archiveButton.dispatchEvent(
   new window.FocusEvent("focusout", { bubbles: true }),
 );
 
+const savedEmployee = window.GFP_APP.getData().employees.find(
+  (item) => item.matricula === "MAT-001",
+);
+const absenceForm = window.document.getElementById("absenceForm");
+absenceForm.elements.personKey.value = `employee:${savedEmployee.id}`;
+absenceForm.elements.tipo.value = "LICENÇA";
+absenceForm.querySelector('input[name="indefinite"][value="Sim"]').click();
+assert.equal(absenceForm.elements.start.required, false);
+assert.equal(absenceForm.elements.end.required, false);
+assert.equal(absenceForm.elements.start.disabled, true);
+assert.equal(
+  [...absenceForm.querySelectorAll(".absence-date-field")].every(
+    (field) => field.hidden,
+  ),
+  true,
+  "as datas devem ser dispensadas para afastamento por tempo indeterminado",
+);
+absenceForm.dispatchEvent(
+  new window.Event("submit", { bubbles: true, cancelable: true }),
+);
+await new Promise((resolve) => setTimeout(resolve, 0));
+const indefiniteAbsence = window.GFP_APP.getData().absences.find(
+  (item) => item.personId === savedEmployee.id && item.indefinite,
+);
+assert.ok(indefiniteAbsence, "o afastamento sem data deve ser salvo");
+assert.equal(indefiniteAbsence.start, "");
+assert.equal(indefiniteAbsence.end, "");
+assert.match(
+  window.document.getElementById("absenceTable").textContent,
+  /Tempo indeterminado/,
+);
+
 employeeSection.querySelector(".registry-toolbar .btn").click();
 employeeForm.elements.nome.value = "Teste Dois";
 employeeForm.elements.cargo.value = "Auxiliar";
@@ -237,6 +269,15 @@ assert.equal(
   window.document.querySelectorAll("#printArea .sheet").length > 0,
   true,
 );
+const employeePointSheet = [
+  ...window.document.querySelectorAll("#printArea .employee-sheet"),
+].find((sheet) => sheet.textContent.includes("Teste Um"));
+assert.ok(employeePointSheet);
+assert.doesNotMatch(
+  employeePointSheet.textContent,
+  /LICENÇA/,
+  "o período indeterminado não deve preencher todos os dias da folha de ponto",
+);
 
 window.generateSectorReport();
 assert.equal(window.document.body.classList.contains("print-sector"), true);
@@ -272,6 +313,17 @@ assert.equal(
   window.document.querySelectorAll("#frequencyPrintArea .frequency-sheet")
     .length > 0,
   true,
+);
+const indefiniteFrequencyRow = [
+  ...window.document.querySelectorAll(
+    "#frequencyPrintArea .employee-frequency tbody tr",
+  ),
+].find((row) => row.textContent.includes("Teste Um"));
+assert.ok(indefiniteFrequencyRow);
+assert.equal(
+  indefiniteFrequencyRow.querySelector(".freq-cell").textContent.trim(),
+  "Licença",
+  "o relatório de frequência deve exibir somente Licença, sem datas",
 );
 
 const systemBackupCard = window.document.getElementById("masterSystemBackup");
