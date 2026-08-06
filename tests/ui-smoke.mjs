@@ -169,6 +169,59 @@ assert.match(
   window.document.getElementById("absenceTable").textContent,
   /Tempo indeterminado/,
 );
+const todayForDashboard = new Date();
+const todayKey = `${todayForDashboard.getFullYear()}-${String(
+  todayForDashboard.getMonth() + 1,
+).padStart(2, "0")}-${String(todayForDashboard.getDate()).padStart(2, "0")}`;
+window.GFP_APP.getData().occurrences.push({
+  id: "occ-dashboard-today",
+  personType: "employee",
+  personId: savedEmployee.id,
+  start: todayKey,
+  end: todayKey,
+  tipo: "Atestado Médico",
+  duracao: "",
+  comprovante: "",
+  rotulo: "",
+  complemento: "",
+  observacao: "",
+});
+window.GFP_APP.renderAll();
+const dashboard = window.document.getElementById("homeDashboard");
+assert.match(
+  dashboard.textContent,
+  /Afastamentos hoje/,
+  "o card da tela inicial deve usar o rótulo amplo de afastamentos",
+);
+assert.doesNotMatch(
+  dashboard.textContent,
+  /afastados hoje/,
+  "o rótulo antigo não deve aparecer na tela inicial",
+);
+assert.equal(
+  dashboard.querySelector(".home-summary-button .home-summary-value")
+    .textContent,
+  "2",
+  "férias/licenças e ocorrências de hoje devem ser somadas no card",
+);
+assert.match(
+  dashboard.textContent.toLocaleLowerCase("pt-BR"),
+  /atestado médico hoje/,
+  "os avisos devem detalhar ocorrências de hoje por tipo",
+);
+assert.match(
+  dashboard.textContent.toLocaleLowerCase("pt-BR"),
+  /licença hoje/,
+  "os avisos devem detalhar férias/licenças de hoje por tipo",
+);
+assert.match(
+  dashboard.querySelector(".home-summary-button").getAttribute("onclick") || "",
+  /showView\('afastamentos'\)/,
+  "o card de afastamentos deve ter atalho para a área de movimentações",
+);
+window.GFP_APP.getData().occurrences = window.GFP_APP.getData().occurrences.filter(
+  (item) => item.id !== "occ-dashboard-today",
+);
 
 employeeSection.querySelector(".registry-toolbar .btn").click();
 employeeForm.elements.nome.value = "Teste Dois";
