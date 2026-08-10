@@ -718,6 +718,23 @@
   function isReadOnly() {
     return Boolean(state.preview) || effectiveRole() === "consulta";
   }
+  function isDemoUnit(school) {
+    const settings = window.GFP_APP?.getData?.()?.settings || {};
+    const text = [
+      school?.name,
+      school?.short_name,
+      school?.code,
+      settings.escola,
+      settings.escolaCurta,
+      settings.prefeitura,
+      settings.secretaria,
+      settings.emailUnidade,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLocaleLowerCase("pt-BR");
+    return /teste|demo|demonstra/.test(text);
+  }
   function applyUI() {
     const r = effectiveRole();
     document.body.classList.remove(
@@ -740,6 +757,8 @@
       state.preview?.school;
     el("headerSchoolName").textContent =
       school?.short_name || school?.name || "Unidade não selecionada";
+    const demoBadge = el("demoModeBadge");
+    if (demoBadge) demoBadge.hidden = !isDemoUnit(school);
     el("previewAsBanner").classList.toggle("active", Boolean(state.preview));
     if (state.preview)
       el("previewAsText").textContent =
