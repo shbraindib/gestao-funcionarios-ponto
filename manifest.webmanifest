@@ -1,13 +1,13 @@
 {
-  "name": "Gestão de Funcionários e Ponto — Online",
-  "short_name": "Gestão e Ponto",
-  "description": "Gestão funcional e emissão de folhas e quadros de frequência para unidades escolares.",
+  "name": "DIB STAFF — Gestão de Funcionários e Ponto",
+  "short_name": "DIB STAFF",
+  "description": "Sistema DIB STAFF para gestão funcional e emissão de folhas e quadros de frequência.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#eef2f7",
-  "theme_color": "#16467f",
+  "theme_color": "#020914",
   "lang": "pt-BR",
   "icons": [
     {
