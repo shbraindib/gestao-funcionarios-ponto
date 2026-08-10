@@ -1,7 +1,7 @@
 {
-  "name": "DIB STAFF — Gestão de Funcionários e Ponto",
+  "name": "DIB STAFF - Gestão de Pessoas SME_CJ",
   "short_name": "DIB STAFF",
-  "description": "Sistema DIB STAFF para gestão funcional e emissão de folhas e quadros de frequência.",
+  "description": "Sistema DIB STAFF para gestão de pessoas da SME_CJ.",
   "id": "./",
   "start_url": "./",
   "scope": "./",
