@@ -738,9 +738,9 @@
     if (isReadOnly()) document.body.classList.add("preview-readonly");
     el("sessionUser").textContent =
       state.preview?.full_name ||
-      state.profile?.full_name ||
-      state.user?.email ||
-      "";
+      (state.profile?.system_role === "master"
+        ? "MASTER"
+        : state.profile?.full_name || state.user?.email || "");
     el("sessionRole").textContent = roleLabel(r);
     const school =
       state.schools.find((s) => s.id === state.schoolId) ||
