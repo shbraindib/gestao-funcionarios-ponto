@@ -750,7 +750,10 @@
     const demoUnit = isDemoUnit(school);
     document.body.classList.toggle("demo-unit", demoUnit);
     const demoBadge = el("demoModeBadge");
-    if (demoBadge) demoBadge.hidden = !demoUnit;
+    if (demoBadge) {
+      demoBadge.hidden = !demoUnit;
+      demoBadge.style.display = demoUnit ? "" : "none";
+    }
     el("previewAsBanner").classList.toggle("active", Boolean(state.preview));
     if (state.preview)
       el("previewAsText").textContent =
