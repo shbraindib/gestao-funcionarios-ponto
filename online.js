@@ -289,13 +289,41 @@
       ""
     );
   }
+  const schoolAdminRoles = new Set([
+    "master",
+    "admin",
+    "operator",
+    "director_admin",
+    "tech_admin",
+  ]);
+  const taskViewerRoles = new Set(["consulta", "director_view", "tech_view"]);
+  const taskWritableRoles = new Set([
+    ...schoolAdminRoles,
+    ...taskViewerRoles,
+  ]);
+  function isSchoolAdminRole(role = effectiveRole()) {
+    return schoolAdminRoles.has(role);
+  }
+  function isTaskViewerRole(role = effectiveRole()) {
+    return taskViewerRoles.has(role);
+  }
+  function canEditTasks() {
+    return !state.preview && taskWritableRoles.has(effectiveRole());
+  }
+  function canDeleteTasks() {
+    return !state.preview && isSchoolAdminRole();
+  }
   function roleLabel(r) {
     return (
       {
-        master: "Administrador Geral",
-        admin: "Administrador da escola",
-        operator: "Operador",
-        consulta: "Consulta",
+        master: "MASTER",
+        admin: "SecretÃ¡rio / Oficial",
+        operator: "Administrador da escola (legado)",
+        director_admin: "Diretor / Coordenador administrador",
+        tech_admin: "Coordenador TÃ©cnico administrador",
+        consulta: "VisualizaÃ§Ã£o com tarefas (legado)",
+        director_view: "Diretor / Coordenador visualizaÃ§Ã£o",
+        tech_view: "Coordenador TÃ©cnico visualizaÃ§Ã£o",
       }[r] ||
       r ||
       "Sem permissão"
@@ -687,6 +715,61 @@
       );
     window.GFP_APP.setData(payload);
   }
+  async function saveTasks(tasks) {
+    await ensureSchoolReady();
+    if (!canEditTasks())
+      throw new Error("Seu perfil nao permite alterar tarefas.");
+    const payload = window.GFP_APP.getData();
+    payload.tasks = Array.isArray(tasks) ? tasks : [];
+    if (!isTaskViewerRole()) {
+      await saveNow(payload);
+      return;
+    }
+    if (state.conflict)
+      throw new Error(
+        "Os dados foram alterados por outro usuario. Recarregue a unidade antes de salvar tarefas.",
+      );
+    const expected = Number(state.dataVersion || 0);
+    state.saving = true;
+    setCloud("Salvando tarefas...", "saving");
+    try {
+      await ensureToken();
+      const result = await rest("rpc/update_school_tasks", "", {
+        method: "POST",
+        body: {
+          target_school: state.schoolId,
+          expected_version: expected,
+          next_tasks: payload.tasks,
+        },
+      });
+      const confirmed = Array.isArray(result) ? result[0] : result;
+      if (!confirmed) {
+        markConflict();
+        throw new Error("Os dados foram alterados por outro usuario.");
+      }
+      if (Number(confirmed.version) !== expected + 1)
+        throw new Error("O servidor nao confirmou a nova versao das tarefas.");
+      state.dataVersion = Number(confirmed.version);
+      state.lastChange = confirmed;
+      setCloud(formatLastChange(confirmed), "ok");
+      try {
+        localStorage.setItem(localCacheKey(), JSON.stringify(payload));
+      } catch {}
+      window.GFP_APP.setData(payload);
+    } catch (error) {
+      if (!state.conflict) {
+        setCloud("Falha ao salvar tarefas", "error", () => saveTasks(tasks));
+        notify(errorText(error), "error", {
+          sticky: true,
+          actionLabel: "Tentar novamente",
+          onAction: () => saveTasks(tasks),
+        });
+      }
+      throw error;
+    } finally {
+      state.saving = false;
+    }
+  }
   async function audit(action, entity, details = {}) {
     try {
       await rest("audit_logs", "", {
@@ -706,17 +789,12 @@
     }
   }
   function canOpenView(view) {
-    const r = effectiveRole();
     if (view === "admin")
       return state.profile?.system_role === "master" && !state.preview;
-    if (r === "consulta")
-      return ["inicio", "gerar", "frequencia", "relatorios", "sobre"].includes(
-        view,
-      );
     return true;
   }
   function isReadOnly() {
-    return Boolean(state.preview) || effectiveRole() === "consulta";
+    return Boolean(state.preview) || isTaskViewerRole();
   }
   function isDemoUnit(school) {
     const text = [school?.name, school?.short_name]
@@ -732,6 +810,10 @@
       "role-admin",
       "role-operator",
       "role-consulta",
+      "role-director_admin",
+      "role-tech_admin",
+      "role-director_view",
+      "role-tech_view",
       "preview-readonly",
     );
     document.body.classList.add("role-" + r);
@@ -1271,7 +1353,12 @@
     form.elements.password.required = false;
     if (membership) {
       form.elements.school_id.value = membership.school_id;
-      form.elements.role.value = membership.role;
+      form.elements.role.value =
+        [...form.elements.role.options].some((option) => option.value === membership.role)
+          ? membership.role
+          : membership.role === "consulta"
+            ? "director_view"
+            : "admin";
     }
     form.querySelector(
       `input[name="active"][value="${user.active ? "true" : "false"}"]`,
@@ -1560,12 +1647,14 @@
     start,
     queueSave,
     saveNow,
+    saveTasks,
     ensureSchoolReady,
     isReady: () => state.ready,
     isReadOnly,
+    canEditTasks,
+    canDeleteTasks,
     canOpenView,
-    canPermanentlyDelete: () =>
-      !state.preview && ["master", "admin"].includes(effectiveRole()),
+    canPermanentlyDelete: canDeleteTasks,
     storageLabel: () =>
       state.schoolId
         ? "Banco online da unidade selecionada"

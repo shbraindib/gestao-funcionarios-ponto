@@ -32,7 +32,12 @@ window.gfpOnline = {
   storageLabel: () => "",
   queueSave: () => {},
   saveNow: async () => {},
+  saveTasks: async (tasks) => {
+    window.GFP_APP.getData().tasks = tasks;
+  },
   canOpenView: () => true,
+  canEditTasks: () => true,
+  canDeleteTasks: () => true,
   canPermanentlyDelete: () => true,
   dashboardContext: () => ({}),
 };
@@ -393,6 +398,50 @@ assert.ok(
 assert.match(systemBackupCard.textContent, /senhas nunca entram no arquivo/i);
 assert.match(systemBackupCard.textContent, /RESTAURAR SISTEMA/);
 
+assert.match(html, /Secretário \/ Oficial/);
+assert.match(html, /Diretor \/ Coordenador administrador/);
+assert.match(html, /Coordenador Técnico visualização/);
+assert.doesNotMatch(
+  html,
+  /body\.role-consulta nav button/,
+  "usuários de visualização devem conseguir navegar por todas as telas",
+);
+
+window.GFP_APP.getData().tasks = [
+  {
+    id: "task-viewer",
+    title: "Conferir pendências",
+    priority: "baixa",
+    due: "",
+    done: false,
+    createdAt: new Date().toISOString(),
+    createdBy: "Teste",
+    completedAt: "",
+    completedBy: "",
+  },
+];
+window.gfpOnline.isReadOnly = () => true;
+window.gfpOnline.canEditTasks = () => true;
+window.gfpOnline.canDeleteTasks = () => false;
+window.GFP_APP.renderAll();
+const viewerDashboard = window.document.getElementById("homeDashboard");
+assert.ok(
+  viewerDashboard.querySelector(".home-task-form"),
+  "perfis de visualização devem poder incluir tarefas",
+);
+assert.equal(
+  viewerDashboard.querySelector(".task-delete"),
+  null,
+  "perfis de visualização não devem excluir tarefas",
+);
+assert.equal(
+  viewerDashboard.querySelector('.home-task input[type="checkbox"]').disabled,
+  false,
+  "perfis de visualização devem poder concluir tarefas",
+);
+window.gfpOnline.isReadOnly = () => false;
+window.gfpOnline.canDeleteTasks = () => true;
+
 const adminFunction = await fs.readFile(
   path.join(project, "supabase/functions/admin-users/index.ts"),
   "utf8",
@@ -401,6 +450,30 @@ assert.match(adminFunction, /body\.action === 'export_system_backup'/);
 assert.match(adminFunction, /body\.action === 'restore_system_backup'/);
 assert.match(adminFunction, /profile\.system_role !== 'master'/);
 assert.match(adminFunction, /includes_passwords:\s*false/);
+assert.match(adminFunction, /director_admin/);
+assert.match(adminFunction, /tech_view/);
+assert.match(adminFunction, /normalizeRole\(body\.role\)/);
+
+const roleMigration = await fs.readFile(
+  path.join(
+    project,
+    "supabase/migrations/20260811132500_add_task_viewer_roles.sql",
+  ),
+  "utf8",
+);
+assert.match(roleMigration, /create or replace function public\.update_school_tasks/);
+assert.match(roleMigration, /grant execute on function public\.update_school_tasks/);
+assert.match(roleMigration, /'director_view'/);
+assert.match(roleMigration, /'tech_view'/);
+assert.match(
+  roleMigration,
+  /create policy school_data_update[\s\S]*'director_admin'[\s\S]*'tech_admin'/,
+);
+assert.doesNotMatch(
+  roleMigration,
+  /create policy school_data_update[\s\S]*'director_view'/,
+  "visualização não deve receber update direto no bloco completo da escola",
+);
 assert.match(
   onlineJs,
   /location\.origin\s*\+\s*location\.pathname/,

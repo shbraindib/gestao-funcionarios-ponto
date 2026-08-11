@@ -8,7 +8,15 @@ const corsHeaders = {
 const backupFormat = 'gestao-funcionarios-ponto/system-backup'
 const backupVersion = 1
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const allowedRoles = new Set(['admin', 'operator', 'consulta'])
+const allowedRoles = new Set([
+  'admin',
+  'operator',
+  'consulta',
+  'director_admin',
+  'tech_admin',
+  'director_view',
+  'tech_view',
+])
 const reply = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -16,6 +24,11 @@ const reply = (body: unknown, status = 200) =>
   })
 const clean = (value: unknown) => String(value || '').trim()
 const validUuid = (value: unknown) => uuidPattern.test(clean(value))
+const normalizeRole = (value: unknown, fallback = 'admin') => {
+  const role = clean(value) || fallback
+  if (!allowedRoles.has(role)) throw new Error('Permissão inválida para o usuário.')
+  return role
+}
 
 async function allAuthUsers(admin: any) {
   const users: any[] = []
@@ -323,7 +336,7 @@ Deno.serve(async (req) => {
         throw profileError
       }
       const { error: membershipError } = await admin.from('memberships').upsert(
-        { user_id: uid, school_id: body.school_id, role: body.role || 'operator', active: true },
+        { user_id: uid, school_id: body.school_id, role: normalizeRole(body.role), active: true },
         { onConflict: 'user_id,school_id' },
       )
       if (membershipError) {
@@ -336,7 +349,7 @@ Deno.serve(async (req) => {
     if (body.action === 'add_membership') {
       if (!body.user_id || !body.school_id) return reply({ error: 'Informe usuário e escola.' }, 400)
       const { error } = await admin.from('memberships').upsert(
-        { user_id: body.user_id, school_id: body.school_id, role: body.role || 'operator', active: true },
+        { user_id: body.user_id, school_id: body.school_id, role: normalizeRole(body.role), active: true },
         { onConflict: 'user_id,school_id' },
       )
       if (error) throw error
@@ -389,7 +402,7 @@ Deno.serve(async (req) => {
       if (profileError) throw profileError
       const { error: membershipError } = await admin
         .from('memberships')
-        .update({ school_id: schoolId, role: body.role || 'operator', active: true })
+        .update({ school_id: schoolId, role: normalizeRole(body.role), active: true })
         .eq('id', membershipId)
         .eq('user_id', userId)
       if (membershipError) throw membershipError
@@ -401,7 +414,7 @@ Deno.serve(async (req) => {
       const { error: profileError } = await admin.from('profiles').update({ active: Boolean(body.active) }).eq('id', body.user_id)
       if (profileError) throw profileError
       if (body.membership_id) {
-        const { error: membershipError } = await admin.from('memberships').update({ role: body.role || 'operator' }).eq('id', body.membership_id)
+        const { error: membershipError } = await admin.from('memberships').update({ role: normalizeRole(body.role) }).eq('id', body.membership_id)
         if (membershipError) throw membershipError
       }
       return reply({ ok: true })
