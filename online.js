@@ -1674,6 +1674,9 @@
       return {
         userName:
           state.preview?.full_name ||
+          (state.profile?.system_role === "master" && !state.preview
+            ? "MASTER"
+            : "") ||
           state.profile?.full_name ||
           state.user?.email ||
           "",
