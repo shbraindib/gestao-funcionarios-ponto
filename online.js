@@ -308,7 +308,10 @@
     return taskViewerRoles.has(role);
   }
   function canEditTasks() {
-    return !state.preview && taskWritableRoles.has(effectiveRole());
+    return (
+      taskWritableRoles.has(effectiveRole()) &&
+      (!state.preview || isTaskViewerRole(effectiveRole()))
+    );
   }
   function canDeleteTasks() {
     return !state.preview && isSchoolAdminRole();
@@ -317,13 +320,13 @@
     return (
       {
         master: "MASTER",
-        admin: "SecretÃ¡rio / Oficial",
+        admin: "Secretário / Oficial",
         operator: "Administrador da escola (legado)",
         director_admin: "Diretor / Coordenador administrador",
-        tech_admin: "Coordenador TÃ©cnico administrador",
-        consulta: "VisualizaÃ§Ã£o com tarefas (legado)",
-        director_view: "Diretor / Coordenador visualizaÃ§Ã£o",
-        tech_view: "Coordenador TÃ©cnico visualizaÃ§Ã£o",
+        tech_admin: "Coordenador Técnico administrador",
+        consulta: "Visualização com tarefas (legado)",
+        director_view: "Diretor / Coordenador visualização",
+        tech_view: "Coordenador Técnico visualização",
       }[r] ||
       r ||
       "Sem permissão"
@@ -839,7 +842,7 @@
     el("previewAsBanner").classList.toggle("active", Boolean(state.preview));
     if (state.preview)
       el("previewAsText").textContent =
-        `${state.preview.full_name} • ${school?.name || ""} • ${roleLabel(r)} • somente leitura`;
+        `${state.preview.full_name} • ${school?.name || ""} • ${roleLabel(r)} • ${isTaskViewerRole(r) ? "tarefas liberadas" : "somente leitura"}`;
     el("aboutContactText").textContent =
       [
         cfg.supportEmail && cfg.supportEmail !== "SEU-EMAIL-DE-SUPORTE"
