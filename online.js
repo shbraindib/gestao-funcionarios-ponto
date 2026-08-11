@@ -719,21 +719,11 @@
     return Boolean(state.preview) || effectiveRole() === "consulta";
   }
   function isDemoUnit(school) {
-    const settings = window.GFP_APP?.getData?.()?.settings || {};
-    const text = [
-      school?.name,
-      school?.short_name,
-      school?.code,
-      settings.escola,
-      settings.escolaCurta,
-      settings.prefeitura,
-      settings.secretaria,
-      settings.emailUnidade,
-    ]
+    const text = [school?.name, school?.short_name]
       .filter(Boolean)
       .join(" ")
       .toLocaleLowerCase("pt-BR");
-    return /teste|demo|demonstra/.test(text);
+    return /\bteste\b/.test(text);
   }
   function applyUI() {
     const r = effectiveRole();
@@ -757,8 +747,10 @@
       state.preview?.school;
     el("headerSchoolName").textContent =
       school?.short_name || school?.name || "Unidade não selecionada";
+    const demoUnit = isDemoUnit(school);
+    document.body.classList.toggle("demo-unit", demoUnit);
     const demoBadge = el("demoModeBadge");
-    if (demoBadge) demoBadge.hidden = !isDemoUnit(school);
+    if (demoBadge) demoBadge.hidden = !demoUnit;
     el("previewAsBanner").classList.toggle("active", Boolean(state.preview));
     if (state.preview)
       el("previewAsText").textContent =
