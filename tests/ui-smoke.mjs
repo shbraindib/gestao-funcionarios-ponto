@@ -204,20 +204,15 @@ assert.equal(
   "2",
   "férias/licenças e ocorrências de hoje devem ser somadas no card",
 );
-assert.match(
-  dashboard.textContent.toLocaleLowerCase("pt-BR"),
-  /atestado médico hoje/,
-  "os avisos devem detalhar ocorrências de hoje por tipo",
-);
-assert.match(
-  dashboard.textContent.toLocaleLowerCase("pt-BR"),
-  /licença hoje/,
-  "os avisos devem detalhar férias/licenças de hoje por tipo",
+assert.doesNotMatch(
+  dashboard.textContent,
+  /Avisos/,
+  "o card de avisos foi removido da tela inicial",
 );
 assert.match(
   dashboard.querySelector(".home-summary-button").getAttribute("onclick") || "",
-  /showView\('afastamentos'\)/,
-  "o card de afastamentos deve ter atalho para a área de movimentações",
+  /showTodayMovements\(\)/,
+  "o card de afastamentos deve abrir a lista rápida do dia",
 );
 window.GFP_APP.getData().occurrences = window.GFP_APP.getData().occurrences.filter(
   (item) => item.id !== "occ-dashboard-today",
@@ -409,12 +404,12 @@ assert.match(adminFunction, /includes_passwords:\s*false/);
 assert.match(
   onlineJs,
   /location\.origin\s*\+\s*location\.pathname/,
-  "a recuperaÃ§Ã£o de senha deve preservar o caminho do app no GitHub Pages",
+  "a recuperação de senha deve preservar o caminho do app no GitHub Pages",
 );
 assert.doesNotMatch(
   onlineJs,
   /redirect_to="\s*\+\s*encodeURIComponent\(location\.origin\)/,
-  "a recuperaÃ§Ã£o de senha nÃ£o pode usar apenas o domÃ­nio do GitHub Pages",
+  "a recuperação de senha não pode usar apenas o domínio do GitHub Pages",
 );
 
 console.log("UI smoke test passed");
