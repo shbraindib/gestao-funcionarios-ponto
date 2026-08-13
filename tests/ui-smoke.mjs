@@ -71,6 +71,15 @@ assert.doesNotMatch(html, /Versão 1\.18[\s\S]*function canonicalOccurrence/, "o
 assert.match(html, /frequency\.js\?v=20260813-1/, "deve carregar o módulo de frequência");
 assert.equal((html.match(/renderDashboard\s*=\s*function/g) || []).length, 1, "deve manter somente a versão ativa do painel inicial");
 assert.doesNotMatch(html, /function renderDashboard\s*\(/, "não deve manter uma implementação antiga do painel");
+assert.ok(window.document.getElementById("desktopNavToggle"), "deve oferecer controle para recolher o menu lateral");
+window.document.getElementById("desktopNavToggle").click();
+assert.ok(window.document.body.classList.contains("nav-collapsed"), "deve recolher o menu lateral");
+window.document.getElementById("desktopNavToggle").click();
+assert.ok(!window.document.body.classList.contains("nav-collapsed"), "deve reexibir o menu lateral");
+assert.ok(window.document.getElementById("deleteEventBtn"), "deve oferecer exclusão de datas do calendário");
+assert.match(timebankJs, /closeTimeBankExtract\(\);const ok=await/, "deve fechar o extrato antes de abrir a confirmação");
+assert.match(html, /activeTeachers=data\.teachers\.filter\(t=>isActive\(t\)&&!isSubstitute\(t\)\)/, "o card deve desconsiderar professores substitutos");
+assert.match(timebankJs, /Memorandos e Ofícios/, "deve exibir as novidades atuais do sistema");
 
 assert.ok(window.document.getElementById("view-historico"), "deve criar a tela de histórico");
 assert.match(onlineJs, /async function auditChange/, "deve expor o registro seguro de auditoria");
