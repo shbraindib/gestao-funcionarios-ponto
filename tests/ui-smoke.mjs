@@ -80,6 +80,12 @@ assert.ok(window.document.getElementById("deleteEventBtn"), "deve oferecer exclu
 assert.match(timebankJs, /closeTimeBankExtract\(\);const ok=await/, "deve fechar o extrato antes de abrir a confirmação");
 assert.match(html, /activeTeachers=data\.teachers\.filter\(t=>isActive\(t\)&&!isSubstitute\(t\)\)/, "o card deve desconsiderar professores substitutos");
 assert.match(timebankJs, /Memorandos e Ofícios/, "deve exibir as novidades atuais do sistema");
+assert.equal(window.document.querySelector('#documentForm [name="requester"]').closest("label").firstChild.nodeValue, "Remetente", "o cadastro de documentos deve usar Remetente");
+for (const id of ["memorandumList", "officialLetterList"]) {
+  const list = window.document.getElementById(id);
+  assert.equal(list.style.overflowY, "auto", `${id} deve ter rolagem interna`);
+  assert.equal(list.style.maxHeight, "560px", `${id} deve limitar a altura do card`);
+}
 
 assert.ok(window.document.getElementById("view-historico"), "deve criar a tela de histórico");
 assert.match(onlineJs, /async function auditChange/, "deve expor o registro seguro de auditoria");

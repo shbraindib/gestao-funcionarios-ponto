@@ -22,6 +22,16 @@
     section.className = "view";
     section.innerHTML = `<div class="card"><div class="documents-heading"><div><h2>Memorandos | Ofícios</h2><p>Controle a numeração e o histórico dos documentos administrativos da unidade.</p></div></div><form id="documentForm"><input type="hidden" name="id"><div class="grid cols-3"><label>Tipo<select name="type" required><option value="memorandum">Memorando</option><option value="official_letter">Ofício</option></select></label><label>Número<input name="number" required placeholder="001/2026" maxlength="10"></label><label>Data<input type="date" name="date" required></label><label>Solicitante<input name="requester" required maxlength="160"></label><label>Destinatário<input name="recipient" required maxlength="160"></label><label>Status<select name="status"><option>Rascunho</option><option>Enviado</option><option>Respondido</option><option>Arquivado</option></select></label></div><label class="documents-subject">Assunto<input name="subject" required maxlength="240"></label><label>Observações<textarea name="notes" maxlength="1000" placeholder="Informações complementares opcionais"></textarea></label><div id="documentFormError" class="documents-error" role="alert"></div><div class="actions"><button class="btn" type="submit">Salvar documento</button><button id="documentCancelEdit" class="btn light" type="button">Limpar</button></div></form></div><div class="card"><div class="documents-filters"><label>Busca<input id="documentSearch" type="search" placeholder="Número, destinatário ou assunto"></label><label>Ano<select id="documentYearFilter"><option value="all">Todos os anos</option></select></label></div></div><div class="documents-columns"><div class="card"><div class="documents-list-head"><div><h3>Memorandos</h3><span id="memorandumCount"></span></div></div><div id="memorandumList"></div></div><div class="card"><div class="documents-list-head"><div><h3>Ofícios</h3><span id="officialLetterCount"></span></div></div><div id="officialLetterList"></div></div></div>`;
     document.querySelector("main").appendChild(section);
+    const requesterLabel = section.querySelector('[name="requester"]')?.closest("label");
+    if (requesterLabel?.firstChild) requesterLabel.firstChild.nodeValue = "Remetente";
+    for (const id of ["memorandumList", "officialLetterList"])
+      Object.assign(section.querySelector(`#${id}`).style, {
+        maxHeight: "560px",
+        overflowY: "auto",
+        overscrollBehavior: "contain",
+        paddingRight: "6px",
+        scrollbarGutter: "stable",
+      });
   }
 
   installView();
@@ -106,7 +116,7 @@
     return `status-${fold(status).replace(/[^a-z0-9]+/g, "-")}`;
   }
   function itemHtml(item) {
-    return `<article class="document-item"><div class="document-item-top"><div><div class="document-number">${esc(item.number)}</div><div class="document-date">${esc(formatDatePt(item.date))}</div></div><span class="document-status ${statusClass(item.status)}">${esc(item.status)}</span></div><div class="document-subject">${esc(item.subject)}</div><div class="document-route"><strong>Solicitante:</strong> ${esc(item.requester)}<br><strong>Destinatário:</strong> ${esc(item.recipient)}</div>${item.notes ? `<div class="document-notes">${esc(item.notes)}</div>` : ""}<div class="document-actions"><button class="mini-btn edit" type="button" data-document-edit="${esc(item.id)}">Editar</button><button class="mini-btn del" type="button" data-document-delete="${esc(item.id)}">Excluir</button></div></article>`;
+    return `<article class="document-item"><div class="document-item-top"><div><div class="document-number">${esc(item.number)}</div><div class="document-date">${esc(formatDatePt(item.date))}</div></div><span class="document-status ${statusClass(item.status)}">${esc(item.status)}</span></div><div class="document-subject">${esc(item.subject)}</div><div class="document-route"><strong>Remetente:</strong> ${esc(item.requester)}<br><strong>Destinatário:</strong> ${esc(item.recipient)}</div>${item.notes ? `<div class="document-notes">${esc(item.notes)}</div>` : ""}<div class="document-actions"><button class="mini-btn edit" type="button" data-document-edit="${esc(item.id)}">Editar</button><button class="mini-btn del" type="button" data-document-delete="${esc(item.id)}">Excluir</button></div></article>`;
   }
   function populateYears() {
     const current = yearFilter.value || "all";
