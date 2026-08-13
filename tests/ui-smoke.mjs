@@ -12,11 +12,24 @@ const enhancements = await fs.readFile(
   path.join(project, "enhancements.js"),
   "utf8",
 );
+const documentsJs = await fs.readFile(
+  path.join(project, "documents.js"),
+  "utf8",
+);
+const exportsJs = await fs.readFile(path.join(project, "exports.js"), "utf8");
+const inconsistenciesJs = await fs.readFile(
+  path.join(project, "inconsistencies.js"),
+  "utf8",
+);
+const auditJs = await fs.readFile(path.join(project, "audit.js"), "utf8");
+const timebankJs = await fs.readFile(path.join(project, "timebank.js"), "utf8");
+const frequencyJs = await fs.readFile(path.join(project, "frequency.js"), "utf8");
 const enhancementCss = await fs.readFile(
   path.join(project, "enhancements.css"),
   "utf8",
 );
 const onlineJs = await fs.readFile(path.join(project, "online.js"), "utf8");
+const auditCalls = [];
 const window = new Window({ url: "https://local.test/" });
 window.document.write(html.replace(/<script[\s\S]*?<\/script>/gi, ""));
 window.structuredClone = globalThis.structuredClone;
@@ -39,13 +52,123 @@ window.gfpOnline = {
   canEditTasks: () => true,
   canDeleteTasks: () => true,
   canPermanentlyDelete: () => true,
+  canViewAudit: () => true,
+  auditChange: async (...args) => auditCalls.push(args),
+  listAuditLogs: async () => [{ id: "log-1", action: "update", entity: "employee", details: { actor_name: "Administradora" }, created_at: "2026-08-13T12:00:00Z" }],
   dashboardContext: () => ({}),
 };
 
 const inline = [
   ...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi),
 ].map((match) => match[1]);
-window.eval(`${inline.join("\n")}\n${enhancements}`);
+window.eval(
+  `${inline.join("\n")}\n${frequencyJs}\n${timebankJs}\n${enhancements}\n${documentsJs}\n${exportsJs}\n${inconsistenciesJs}\n${auditJs}`,
+);
+
+assert.doesNotMatch(html, /Banco de horas da unidade[\s\S]*function parseTimeBankHours/, "o banco de horas não deve permanecer embutido no HTML");
+assert.match(html, /timebank\.js\?v=20260813-1/, "deve carregar o módulo de banco de horas");
+assert.doesNotMatch(html, /Versão 1\.18[\s\S]*function canonicalOccurrence/, "ocorrências e frequência não devem permanecer embutidas no HTML");
+assert.match(html, /frequency\.js\?v=20260813-1/, "deve carregar o módulo de frequência");
+assert.equal((html.match(/renderDashboard\s*=\s*function/g) || []).length, 1, "deve manter somente a versão ativa do painel inicial");
+assert.doesNotMatch(html, /function renderDashboard\s*\(/, "não deve manter uma implementação antiga do painel");
+
+assert.ok(window.document.getElementById("view-historico"), "deve criar a tela de histórico");
+assert.match(onlineJs, /async function auditChange/, "deve expor o registro seguro de auditoria");
+assert.match(onlineJs, /async function listAuditLogs/, "deve permitir consultar o histórico da unidade");
+assert.doesNotMatch(onlineJs, /safeDetails\.(cpf|rg|telefone|notes|observacao)/i, "a auditoria não deve copiar dados pessoais");
+window.DIB_AUDIT.record("update", "employee", "employee-1", { status: "Ativo" });
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.deepEqual(auditCalls[0], ["update", "employee", "employee-1", { status: "Ativo" }]);
+
+for (const key of ["employees", "teachers", "occurrences", "timebank"])
+  assert.ok(
+    window.document.querySelector(`[data-export-for="${key}"]`),
+    `${key} deve oferecer exportação CSV e Excel`,
+  );
+const safeCsv = window.DIB_EXPORTS.buildCsv({
+  headers: ["Nome", "Conteúdo"],
+  rows: [["Teste", "=2+2"]],
+});
+assert.equal(safeCsv.charCodeAt(0), 0xfeff, "o CSV deve começar com BOM UTF-8");
+assert.match(safeCsv, /"'=2\+2"/, "o CSV deve neutralizar fórmulas em células de texto");
+const xlsxBytes = window.DIB_EXPORTS.buildXlsx({
+  definition: { label: "Teste" },
+  headers: ["Nome"],
+  rows: [["Álvaro"]],
+});
+assert.deepEqual(
+  [...xlsxBytes.slice(0, 4)],
+  [0x50, 0x4b, 0x03, 0x04],
+  "o arquivo Excel deve ser um pacote XLSX/ZIP válido",
+);
+assert.match(new TextDecoder().decode(xlsxBytes), /xl\/worksheets\/sheet1\.xml/);
+
+const documentsView = window.document.getElementById("view-documentos");
+const documentForm = window.document.getElementById("documentForm");
+assert.ok(documentsView, "a tela de memorandos e ofícios deve ser criada");
+assert.ok(
+  window.document.querySelector('nav button[data-view="documentos"]'),
+  "a tela documental deve aparecer na navegação",
+);
+documentForm.elements.date.value = "2026-08-13";
+documentForm.elements.date.dispatchEvent(new window.Event("change", { bubbles: true }));
+assert.equal(documentForm.elements.number.value, "001/2026");
+documentForm.elements.requester.value = "Direção";
+documentForm.elements.recipient.value = "Secretaria";
+documentForm.elements.subject.value = "Solicitação de material";
+documentForm.elements.status.value = "Enviado";
+documentForm.dispatchEvent(
+  new window.Event("submit", { bubbles: true, cancelable: true }),
+);
+assert.equal(window.GFP_APP.getData().documents.length, 1);
+assert.equal(window.GFP_APP.getData().documents[0].number, "001/2026");
+assert.equal(documentForm.elements.number.value, "002/2026");
+documentForm.elements.type.value = "official_letter";
+documentForm.elements.type.dispatchEvent(new window.Event("change", { bubbles: true }));
+assert.equal(
+  documentForm.elements.number.value,
+  "001/2026",
+  "memorandos e ofícios devem ter sequências independentes",
+);
+documentForm.elements.requester.value = "Direção";
+documentForm.elements.recipient.value = "SME";
+documentForm.elements.subject.value = "Resposta institucional";
+documentForm.dispatchEvent(
+  new window.Event("submit", { bubbles: true, cancelable: true }),
+);
+assert.equal(window.GFP_APP.getData().documents.length, 2);
+assert.match(window.document.getElementById("memorandumList").textContent, /Solicitação de material/);
+assert.match(window.document.getElementById("officialLetterList").textContent, /Resposta institucional/);
+window.document.querySelector("#memorandumList [data-document-edit]").click();
+assert.ok(documentForm.elements.id.value, "editar deve carregar o identificador do documento");
+documentForm.elements.subject.value = "Solicitação de material revisada";
+documentForm.dispatchEvent(
+  new window.Event("submit", { bubbles: true, cancelable: true }),
+);
+assert.equal(window.GFP_APP.getData().documents.length, 2);
+assert.match(window.document.getElementById("memorandumList").textContent, /material revisada/);
+const documentSearch = window.document.getElementById("documentSearch");
+documentSearch.value = "material";
+documentSearch.dispatchEvent(new window.Event("input", { bubbles: true }));
+assert.match(window.document.getElementById("memorandumList").textContent, /Solicitação de material/);
+assert.doesNotMatch(window.document.getElementById("officialLetterList").textContent, /Resposta institucional/);
+documentSearch.value = "";
+documentSearch.dispatchEvent(new window.Event("input", { bubbles: true }));
+documentForm.elements.type.value = "memorandum";
+documentForm.elements.type.dispatchEvent(new window.Event("change", { bubbles: true }));
+documentForm.elements.number.value = "001/2026";
+documentForm.elements.requester.value = "Teste";
+documentForm.elements.recipient.value = "Teste";
+documentForm.elements.subject.value = "Número duplicado";
+documentForm.dispatchEvent(
+  new window.Event("submit", { bubbles: true, cancelable: true }),
+);
+assert.match(
+  window.document.getElementById("documentFormError").textContent,
+  /já está cadastrado/i,
+  "a sequência não deve aceitar números duplicados do mesmo tipo",
+);
+window.DIB_DOCUMENTS.reset();
 
 const employeeSection = window.document.getElementById("view-funcionarios");
 assert.equal(
@@ -94,10 +217,36 @@ employeeForm.querySelector('input[name="plantao"][value="Sim"]').click();
 employeeForm.querySelector('input[name="estudante"][value="Sim"]').click();
 employeeForm.querySelector('input[name="status"][value="Inativo"]').click();
 assert.equal(window.formObj(employeeForm).docTipo, "CPF");
+employeeForm.elements.rg.value = "52998224725";
+employeeForm.elements.rg.dispatchEvent(new window.Event("input", { bubbles: true }));
+assert.equal(employeeForm.elements.rg.value, "529.982.247-25");
+employeeForm.elements.telefone.value = "12999998888";
+employeeForm.elements.telefone.dispatchEvent(
+  new window.Event("input", { bubbles: true }),
+);
+assert.equal(employeeForm.elements.telefone.value, "(12) 99999-8888");
+employeeForm.elements.horario.value = "08001730";
+employeeForm.elements.horario.dispatchEvent(
+  new window.FocusEvent("blur", { bubbles: true }),
+);
+assert.equal(employeeForm.elements.horario.value, "08h00 às 17h30");
+employeeForm.elements.rg.value = "11111111111";
+employeeForm.elements.rg.dispatchEvent(new window.Event("input", { bubbles: true }));
+employeeForm.dispatchEvent(
+  new window.Event("submit", { bubbles: true, cancelable: true }),
+);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.match(
+  employeeForm.elements.rg.closest("label")?.querySelector(".field-error-text")
+    ?.textContent || "",
+  /CPF válido/i,
+  "um CPF inválido deve ser indicado junto ao campo",
+);
 assert.equal(window.formObj(employeeForm).plantao, "Sim");
 assert.equal(window.formObj(employeeForm).estudante, "Sim");
 assert.equal(window.formObj(employeeForm).status, "Inativo");
 employeeForm.querySelector('input[name="docTipo"][value="RG"]').click();
+employeeForm.elements.rg.value = "";
 employeeForm.querySelector('input[name="plantao"][value="Não"]').click();
 employeeForm.querySelector('input[name="estudante"][value="Não"]').click();
 employeeForm.querySelector('input[name="status"][value="Ativo"]').click();
@@ -173,6 +322,63 @@ assert.equal(indefiniteAbsence.end, "");
 assert.match(
   window.document.getElementById("absenceTable").textContent,
   /Tempo indeterminado/,
+);
+window.GFP_APP.getData().absences.push(
+  {
+    id: "absence-overlap-one",
+    personType: "employee",
+    personId: savedEmployee.id,
+    tipo: "FÉRIAS",
+    rotulo: "",
+    indefinite: false,
+    start: "2026-08-01",
+    end: "2026-08-15",
+  },
+  {
+    id: "absence-overlap-two",
+    personType: "employee",
+    personId: savedEmployee.id,
+    tipo: "LICENÇA",
+    rotulo: "",
+    indefinite: false,
+    start: "2026-08-10",
+    end: "2026-08-20",
+  },
+);
+window.GFP_APP.getData().occurrences.push({
+  id: "occurrence-during-absence",
+  personType: "employee",
+  personId: savedEmployee.id,
+  start: "2026-08-12",
+  end: "2026-08-12",
+  tipo: "Atestado Médico",
+});
+const consistencyIssues = window.DIB_INCONSISTENCIES.analyze();
+assert.ok(
+  consistencyIssues.some((item) => item.kind === "absence-overlap"),
+  "afastamentos sobrepostos devem gerar aviso",
+);
+assert.ok(
+  consistencyIssues.some((item) => item.kind === "occurrence-during-absence"),
+  "ocorrências durante afastamentos devem gerar aviso",
+);
+window.DIB_INCONSISTENCIES.render();
+assert.match(
+  window.document.querySelector(".inconsistency-card").textContent,
+  /Possíveis inconsistências/,
+);
+window.document.querySelector("[data-inconsistency-view]").click();
+assert.equal(
+  window.document.getElementById("view-afastamentos").classList.contains("active") ||
+    window.document.getElementById("view-ocorrencias").classList.contains("active"),
+  true,
+  "um aviso deve abrir a tela relacionada",
+);
+window.GFP_APP.getData().absences = window.GFP_APP.getData().absences.filter(
+  (item) => !item.id.startsWith("absence-overlap-"),
+);
+window.GFP_APP.getData().occurrences = window.GFP_APP.getData().occurrences.filter(
+  (item) => item.id !== "occurrence-during-absence",
 );
 const todayForDashboard = new Date();
 const todayKey = `${todayForDashboard.getFullYear()}-${String(
@@ -483,6 +689,57 @@ assert.doesNotMatch(
   onlineJs,
   /redirect_to="\s*\+\s*encodeURIComponent\(location\.origin\)/,
   "a recuperação de senha não pode usar apenas o domínio do GitHub Pages",
+);
+const employeeSearch = employeeSection.querySelector(".registry-search input");
+window.GFP_APP.getData().employees.push({
+  id: "accent-search",
+  nome: "Álvaro Busca",
+  cargo: "Auxiliar",
+  matricula: "BUSCA-1",
+  status: "Ativo",
+});
+window.GFP_APP.renderAll();
+employeeSearch.value = "alvaro";
+employeeSearch.dispatchEvent(new window.Event("input", { bubbles: true }));
+assert.match(
+  window.document.getElementById("employeeTable").textContent,
+  /Álvaro Busca/,
+  "a busca deve ignorar acentos",
+);
+window.GFP_APP.getData().employees = window.GFP_APP.getData().employees.filter(
+  (item) => item.id !== "accent-search",
+);
+employeeSearch.value = "";
+employeeSearch.dispatchEvent(new window.Event("input", { bubbles: true }));
+assert.doesNotMatch(
+  html,
+  /localStorage\.setItem\(STORAGE_KEY/,
+  "a aplicação não deve manter uma segunda cópia global dos dados da escola",
+);
+assert.match(
+  html,
+  /localStorage\.removeItem\(LEGACY_STORAGE_KEY\)/,
+  "a cópia global antiga deve ser removida depois da migração",
+);
+assert.match(
+  onlineJs,
+  /function clearSyncedLocalData\(\)[\s\S]*key\.startsWith\("gfp_school_cache_"\)[\s\S]*clearLegacyLocalData/,
+  "o logout deve limpar caches sincronizados e a cópia global antiga",
+);
+const logoutCleanup = onlineJs.match(
+  /function clearSyncedLocalData\(\)\s*\{([\s\S]*?)\n  \}/,
+)?.[1] || "";
+assert.doesNotMatch(
+  logoutCleanup,
+  /gfp_pending_save_/,
+  "o logout não pode descartar alterações locais ainda pendentes",
+);
+assert.match(html, /online\.js\?v=20260813-1/);
+assert.match(html, /sw\.js\?v=20260813-1/);
+assert.match(
+  await fs.readFile(path.join(project, "sw.js"), "utf8"),
+  /online\.js\?v=20260813-1/,
+  "a página e o service worker devem usar a mesma versão do módulo online",
 );
 
 console.log("UI smoke test passed");

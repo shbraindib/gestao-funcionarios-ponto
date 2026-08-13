@@ -361,6 +361,97 @@
       ])
         if (form.elements[name]) form.elements[name].value = "";
   }
+  function digits(value, limit = Infinity) {
+    return String(value || "")
+      .replace(/\D/g, "")
+      .slice(0, limit);
+  }
+  function formatPhone(value) {
+    const number = digits(value, 11);
+    if (number.length <= 2) return number;
+    if (number.length <= 6) return `(${number.slice(0, 2)}) ${number.slice(2)}`;
+    if (number.length <= 10)
+      return `(${number.slice(0, 2)}) ${number.slice(2, 6)}-${number.slice(6)}`;
+    return `(${number.slice(0, 2)}) ${number.slice(2, 7)}-${number.slice(7)}`;
+  }
+  function formatCpf(value) {
+    const number = digits(value, 11);
+    return number
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1-$2");
+  }
+  function validCpf(value) {
+    const number = digits(value);
+    if (number.length !== 11 || /^(\d)\1{10}$/.test(number)) return false;
+    const check = (length) => {
+      let sum = 0;
+      for (let index = 0; index < length; index += 1)
+        sum += Number(number[index]) * (length + 1 - index);
+      const digit = (sum * 10) % 11;
+      return Number(number[length]) === (digit === 10 ? 0 : digit);
+    };
+    return check(9) && check(10);
+  }
+  function parseTimeRange(value) {
+    const text = String(value || "").trim();
+    if (!text) return null;
+    const compact = digits(text);
+    const parts =
+      compact.length === 8 && /^\d{8}$/.test(text)
+        ? [text, compact.slice(0, 2), compact.slice(2, 4), compact.slice(4, 6), compact.slice(6, 8)]
+        : text.match(/^(\d{1,2})\D+(\d{2})\D+(\d{1,2})\D+(\d{2})$/);
+    if (!parts) return null;
+    const values = parts.slice(1).map(Number);
+    if (values[0] > 23 || values[1] > 59 || values[2] > 23 || values[3] > 59)
+      return { invalid: true };
+    return {
+      formatted: `${String(values[0]).padStart(2, "0")}h${String(values[1]).padStart(2, "0")} às ${String(values[2]).padStart(2, "0")}h${String(values[3]).padStart(2, "0")}`,
+    };
+  }
+  function setupInputAssistance(form) {
+    for (const name of ["telefone", "telefoneEmergencia"]) {
+      const input = form.elements[name];
+      if (!input) continue;
+      input.inputMode = "numeric";
+      input.maxLength = 15;
+      input.addEventListener("input", () => {
+        input.value = formatPhone(input.value);
+      });
+    }
+    const documentInput = form.elements.rg;
+    const applyDocumentMask = () => {
+      if (!documentInput) return;
+      if (form.elements.docTipo?.value === "CPF") {
+        documentInput.inputMode = "numeric";
+        documentInput.maxLength = 14;
+        documentInput.value = formatCpf(documentInput.value);
+      } else {
+        documentInput.inputMode = "text";
+        documentInput.maxLength = 20;
+        documentInput.value = documentInput.value.toLocaleUpperCase("pt-BR");
+      }
+    };
+    documentInput?.addEventListener("input", applyDocumentMask);
+    form.querySelectorAll('[name="docTipo"]').forEach((input) =>
+      input.addEventListener("change", applyDocumentMask),
+    );
+    for (const name of ["horario", "intervalo"]) {
+      const input = form.elements[name];
+      if (!input) continue;
+      input.addEventListener("blur", () => {
+        const range = parseTimeRange(input.value);
+        if (range?.formatted) input.value = range.formatted;
+      });
+    }
+  }
+  function foldSearch(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("pt-BR")
+      .trim();
+  }
   function setupRegistry(type) {
     const cfg = registryConfig(type),
       section = document.getElementById(cfg.sectionId),
@@ -466,6 +557,7 @@
             { title: "Observações", names: ["observacoes"] },
           ];
     groupForm(form, groups);
+    setupInputAssistance(form);
     if (type === "teacher") {
       const substitute = fieldContainer(form, "substituto");
       if (substitute)
@@ -609,6 +701,22 @@
         valid = false;
       }
     }
+    if (obj.rg && obj.docTipo === "CPF" && !validCpf(obj.rg)) {
+      addFieldError(form, "rg", "Informe um CPF válido com 11 dígitos.");
+      valid = false;
+    }
+    for (const name of ["telefone", "telefoneEmergencia"]) {
+      if (obj[name] && ![10, 11].includes(digits(obj[name]).length)) {
+        addFieldError(form, name, "Informe um telefone com DDD e 10 ou 11 dígitos.");
+        valid = false;
+      }
+    }
+    for (const name of ["horario", "intervalo"]) {
+      if (parseTimeRange(obj[name])?.invalid) {
+        addFieldError(form, name, "Informe um horário válido, por exemplo 08h00 às 17h30.");
+        valid = false;
+      }
+    }
     if (!valid)
       form
         .querySelector(
@@ -631,6 +739,8 @@
     button.textContent = "Salvando…";
     try {
       const list = data[cfg.array];
+      const action = obj.id ? "update" : "create";
+      const entityId = obj.id || uid();
       if (obj.id) {
         const target = list.find((item) => item.id === obj.id);
         if (!target)
@@ -638,11 +748,14 @@
             "O cadastro que estava sendo editado não foi encontrado.",
           );
         Object.assign(target, obj);
-      } else list.push({ ...obj, id: uid() });
+      } else list.push({ ...obj, id: entityId });
       data = normalizeData(data);
       persistDataOnly(data);
       renderAll();
       if (window.gfpOnline?.saveNow) await window.gfpOnline.saveNow(data);
+      window.DIB_AUDIT?.record(action, type, entityId, {
+        changed_fields: Object.keys(obj).filter((key) => key !== "id"),
+      });
       registryState[type].snapshot = formSnapshot(form);
       registryState[type].dirty = false;
       await closeEditor(type, true);
@@ -672,6 +785,9 @@
     saveData();
     try {
       if (window.gfpOnline?.saveNow) await window.gfpOnline.saveNow(data);
+      window.DIB_AUDIT?.record(wasActive ? "archive" : "reactivate", type, id, {
+        status: person.status,
+      });
       notify(
         `${person.nome} foi ${wasActive ? "arquivado" : "reativado"}.`,
         "success",
@@ -721,6 +837,9 @@
     saveData();
     try {
       if (window.gfpOnline?.saveNow) await window.gfpOnline.saveNow(data);
+      window.DIB_AUDIT?.record("delete", type, id, {
+        related_count: absences + occurrences,
+      });
       notify(
         "Cadastro e dados relacionados excluídos permanentemente.",
         "success",
@@ -737,7 +856,7 @@
   const baseSortedRegistryItems = window.sortedRegistryItems;
   window.sortedRegistryItems = function (type) {
     let items = baseSortedRegistryItems(type),
-      search = registryState[type]?.search.trim().toLocaleLowerCase("pt-BR");
+      search = foldSearch(registryState[type]?.search);
     if (!search) return items;
     return items.filter((item) =>
       [
@@ -747,10 +866,13 @@
         item.disciplina,
         item.situacao,
         item.setor,
+        item.telefone,
+        item.rg,
+        item.categoria,
+        item.fn,
+        item.sede,
       ].some((value) =>
-        String(value || "")
-          .toLocaleLowerCase("pt-BR")
-          .includes(search),
+        foldSearch(value).includes(search),
       ),
     );
   };
@@ -848,6 +970,14 @@
 
   setupRegistry("employee");
   setupRegistry("teacher");
+  const unitPhone = document.getElementById("configForm")?.elements.telefoneUnidade;
+  if (unitPhone) {
+    unitPhone.inputMode = "numeric";
+    unitPhone.maxLength = 15;
+    unitPhone.addEventListener("input", () => {
+      unitPhone.value = formatPhone(unitPhone.value);
+    });
+  }
   setupActionTooltips();
   renderRegistryList("employee");
   renderRegistryList("teacher");

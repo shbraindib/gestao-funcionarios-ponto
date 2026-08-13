@@ -120,6 +120,20 @@
     state.expiresAt = 0;
     state.user = null;
   }
+  function clearSyncedLocalData() {
+    try {
+      const keys = [];
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index) || "";
+        if (key.startsWith("gfp_school_cache_")) keys.push(key);
+      }
+      keys.push("gfp_last_school");
+      keys.forEach((key) => localStorage.removeItem(key));
+      window.GFP_APP?.clearLegacyLocalData?.();
+    } catch (error) {
+      console.warn("Os dados locais já sincronizados não puderam ser limpos.", error);
+    }
+  }
   function restoreSession() {
     try {
       const s = JSON.parse(localStorage.getItem(authKey) || "null");
@@ -183,6 +197,7 @@
         return;
       }
     }
+    clearSyncedLocalData();
     clearSession();
     location.reload();
   }
@@ -790,6 +805,21 @@
     } catch (e) {
       console.warn("audit", e.message);
     }
+  }
+  async function auditChange(action, entity, entityId = "", details = {}) {
+    if (!state.user?.id || !state.schoolId || isReadOnly()) return;
+    const safeDetails = {
+      entity_id: String(entityId || "").slice(0, 100),
+      actor_name: String(state.profile?.full_name || state.user?.email || "Usuário").slice(0, 160),
+    };
+    for (const key of ["changed_fields", "related_count", "status"])
+      if (details[key] !== undefined) safeDetails[key] = details[key];
+    await audit(String(action).slice(0, 50), String(entity).slice(0, 50), safeDetails);
+  }
+  async function listAuditLogs(limit = 200) {
+    if (!state.schoolId || !isSchoolAdminRole() || state.preview) return [];
+    const safeLimit = Math.min(500, Math.max(1, Number(limit) || 200));
+    return rest("audit_logs", `select=id,action,entity,details,created_at,actor_user_id&school_id=eq.${encodeURIComponent(state.schoolId)}&order=created_at.desc&limit=${safeLimit}`);
   }
   function canOpenView(view) {
     if (view === "admin")
@@ -1658,6 +1688,9 @@
     canDeleteTasks,
     canOpenView,
     canPermanentlyDelete: canDeleteTasks,
+    canViewAudit: () => isSchoolAdminRole() && !state.preview,
+    auditChange,
+    listAuditLogs,
     storageLabel: () =>
       state.schoolId
         ? "Banco online da unidade selecionada"

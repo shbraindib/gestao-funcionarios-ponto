@@ -1,0 +1,1 @@
+.export-toolbar{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin:10px 0}.export-toolbar .mini-btn{font-weight:700;padding:8px 11px}.export-toolbar .export-xlsx{background:#ecfdf3;color:#027a48}.export-toolbar .export-csv{background:#eef4ff;color:#3538cd}@media(max-width:640px){.export-toolbar{justify-content:stretch}.export-toolbar .mini-btn{flex:1}}
