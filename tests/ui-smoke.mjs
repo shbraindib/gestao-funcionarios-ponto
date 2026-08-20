@@ -69,6 +69,7 @@ assert.doesNotMatch(html, /Banco de horas da unidade[\s\S]*function parseTimeBan
 assert.match(html, /timebank\.js\?v=20260820-1/, "deve carregar o módulo de banco de horas");
 assert.doesNotMatch(html, /Versão 1\.18[\s\S]*function canonicalOccurrence/, "ocorrências e frequência não devem permanecer embutidas no HTML");
 assert.match(html, /frequency\.js\?v=20260820-2/, "deve carregar o módulo de frequência");
+assert.match(html, /online\.js\?v=20260820-2/, "deve carregar a sincronização colaborativa atualizada");
 assert.equal(window.document.getElementById("frequencyStart").value, "", "a data inicial da frequência deve começar em branco");
 assert.equal(window.document.getElementById("frequencyEnd").value, "", "a data final da frequência deve começar em branco");
 assert.equal(window.document.getElementById("frequencyIssueDate").value, "", "a data de emissão da frequência deve começar em branco");
@@ -819,11 +820,11 @@ assert.doesNotMatch(
   /gfp_pending_save_/,
   "o logout não pode descartar alterações locais ainda pendentes",
 );
-assert.match(html, /online\.js\?v=20260820-1/);
+assert.match(html, /online\.js\?v=20260820-2/);
 assert.match(html, /sw\.js\?v=20260820-2/);
 assert.match(
   await fs.readFile(path.join(project, "sw.js"), "utf8"),
-  /online\.js\?v=20260820-1/,
+  /online\.js\?v=20260820-2/,
   "a página e o service worker devem usar a mesma versão do módulo online",
 );
 

@@ -21,6 +21,8 @@
     savePromise: null,
     pendingPayload: null,
     pendingBaseVersion: null,
+    pendingBasePayload: null,
+    basePayload: null,
     dataVersion: 0,
     lastChange: null,
     retryAction: null,
@@ -396,12 +398,146 @@
       return null;
     }
   }
-  function storePending(payload, baseVersion = state.dataVersion) {
+  function copyData(value) {
+    if (value === undefined) return undefined;
+    return JSON.parse(JSON.stringify(value));
+  }
+  function stableData(value) {
+    if (Array.isArray(value)) return `[${value.map(stableData).join(",")}]`;
+    if (isDataObject(value))
+      return `{${Object.keys(value)
+        .sort()
+        .map((key) => `${JSON.stringify(key)}:${stableData(value[key])}`)
+        .join(",")}}`;
+    return JSON.stringify(value);
+  }
+  function sameData(a, b) {
+    return stableData(a) === stableData(b);
+  }
+  function isDataObject(value) {
+    return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  }
+  const omitMergedValue = Symbol("omitMergedValue");
+  function keyedDataArray(...arrays) {
+    const items = arrays.flat().filter((item) => item !== undefined);
+    return (
+      items.length > 0 &&
+      items.every(
+        (item) =>
+          isDataObject(item) &&
+          typeof item.id !== "undefined" &&
+          String(item.id).trim() !== "",
+      )
+    );
+  }
+  function mergeDataValue(baseValue, localValue, remoteValue, path, conflicts) {
+    if (localValue === undefined && remoteValue === undefined)
+      return omitMergedValue;
+    if (localValue === undefined && sameData(remoteValue, baseValue))
+      return omitMergedValue;
+    if (remoteValue === undefined && sameData(localValue, baseValue))
+      return omitMergedValue;
+    if (sameData(localValue, baseValue)) return copyData(remoteValue);
+    if (sameData(remoteValue, baseValue)) return copyData(localValue);
+    if (sameData(localValue, remoteValue)) return copyData(localValue);
+    if (
+      isDataObject(baseValue) ||
+      isDataObject(localValue) ||
+      isDataObject(remoteValue)
+    ) {
+      const result = {};
+      const keys = new Set([
+        ...Object.keys(isDataObject(baseValue) ? baseValue : {}),
+        ...Object.keys(isDataObject(localValue) ? localValue : {}),
+        ...Object.keys(isDataObject(remoteValue) ? remoteValue : {}),
+      ]);
+      for (const key of keys) {
+        const merged = mergeDataValue(
+          isDataObject(baseValue) ? baseValue[key] : undefined,
+          isDataObject(localValue) ? localValue[key] : undefined,
+          isDataObject(remoteValue) ? remoteValue[key] : undefined,
+          path ? `${path}.${key}` : key,
+          conflicts,
+        );
+        if (merged !== omitMergedValue) result[key] = merged;
+      }
+      return result;
+    }
+    if (
+      Array.isArray(baseValue) ||
+      Array.isArray(localValue) ||
+      Array.isArray(remoteValue)
+    ) {
+      const base = Array.isArray(baseValue) ? baseValue : [];
+      const local = Array.isArray(localValue) ? localValue : [];
+      const remote = Array.isArray(remoteValue) ? remoteValue : [];
+      if (keyedDataArray(base, local, remote)) {
+        const byId = (items) =>
+          new Map(items.map((item) => [String(item.id), item]));
+        const baseById = byId(base),
+          localById = byId(local),
+          remoteById = byId(remote);
+        const ids = [
+          ...remoteById.keys(),
+          ...localById.keys(),
+          ...baseById.keys(),
+        ].filter((id, index, values) => values.indexOf(id) === index);
+        const result = [];
+        for (const id of ids) {
+          const merged = mergeDataValue(
+            baseById.get(id),
+            localById.get(id),
+            remoteById.get(id),
+            `${path || "dados"}[${id}]`,
+            conflicts,
+          );
+          if (merged !== omitMergedValue) result.push(merged);
+        }
+        return result;
+      }
+    }
+    conflicts.push(path || "dados da unidade");
+    return copyData(localValue);
+  }
+  function mergeSchoolPayload(basePayload, localPayload, remotePayload) {
+    if (!isDataObject(basePayload) || !isDataObject(localPayload) || !isDataObject(remotePayload))
+      return { ok: false, conflicts: ["dados da unidade"] };
+    const conflicts = [];
+    const payload = mergeDataValue(
+      basePayload,
+      localPayload,
+      remotePayload,
+      "",
+      conflicts,
+    );
+    return { ok: conflicts.length === 0, payload, conflicts };
+  }
+  async function latestSchoolData() {
+    const rows = await rest(
+      "school_data",
+      `select=payload,updated_at,updated_by,updated_by_name,version&school_id=eq.${q(state.schoolId)}`,
+    );
+    const row = rows?.[0];
+    if (!row?.payload) throw new Error("Não foi possível obter a versão mais recente dos dados.");
+    return row;
+  }
+  async function mergeWithLatestData(localPayload, basePayload) {
+    if (!basePayload) return { ok: false, conflicts: ["dados da unidade"] };
+    const row = await latestSchoolData();
+    const merged = mergeSchoolPayload(basePayload, localPayload, row.payload);
+    return { ...merged, row };
+  }
+  function storePending(
+    payload,
+    baseVersion = state.dataVersion,
+    basePayload = state.pendingBasePayload || state.basePayload,
+  ) {
     cacheLocal(
       pendingSaveKey(),
       JSON.stringify({
-        payload,
+        payload: copyData(payload),
         baseVersion: Number(baseVersion || 0),
+        basePayload: copyData(basePayload),
         queuedAt: new Date().toISOString(),
       }),
     );
@@ -474,6 +610,7 @@
       state.schoolId = schoolId;
       state.dataVersion = Number(row.version || 1);
       state.lastChange = row;
+      state.basePayload = copyData(payload);
       if (!preserveActual && !state.preview) state.actualSchoolId = schoolId;
       state.role =
         state.profile.system_role === "master"
@@ -489,22 +626,40 @@
         payload = durable.payload;
         state.pendingPayload = durable.payload;
         state.pendingBaseVersion = state.dataVersion;
+        state.pendingBasePayload = copyData(durable.basePayload || state.basePayload);
       } else if (
         durable?.payload &&
         Number(durable.baseVersion) !== state.dataVersion
       ) {
-        state.conflict = true;
-        state.pendingPayload = durable.payload;
-        state.pendingBaseVersion = Number(durable.baseVersion);
-        notify(
-          "Os dados foram alterados por outro usuário. A cópia pendente deste computador foi preservada.",
-          "warning",
-          {
-            sticky: true,
-            actionLabel: "Recarregar dados",
-            onAction: discardPendingAndReload,
-          },
+        const merged = mergeSchoolPayload(
+          durable.basePayload,
+          durable.payload,
+          payload,
         );
+        if (merged.ok) {
+          state.pendingPayload = merged.payload;
+          state.pendingBaseVersion = state.dataVersion;
+          state.pendingBasePayload = copyData(payload);
+          payload = merged.payload;
+          notify(
+            "Alterações pendentes foram unidas automaticamente às atualizações da unidade.",
+            "success",
+          );
+        } else {
+          state.conflict = true;
+          state.pendingPayload = durable.payload;
+          state.pendingBaseVersion = Number(durable.baseVersion);
+          state.pendingBasePayload = copyData(durable.basePayload);
+          notify(
+            "Há alterações simultâneas no mesmo cadastro. Sua cópia local foi preservada.",
+            "warning",
+            {
+              sticky: true,
+              actionLabel: "Recarregar dados",
+              onAction: discardPendingAndReload,
+            },
+          );
+        }
       }
       cacheLocal(localCacheKey(), JSON.stringify(payload));
       applyUI();
@@ -587,6 +742,7 @@
     }
     state.pendingPayload = null;
     state.pendingBaseVersion = null;
+    state.pendingBasePayload = null;
     await loadSchool(schoolId);
   }
   function queueSave(payload) {
@@ -594,10 +750,16 @@
       localStorage.setItem(localCacheKey(), JSON.stringify(payload));
     } catch {}
     if (!state.ready || !state.schoolId || isReadOnly()) return;
-    state.pendingPayload = payload;
-    if (state.pendingBaseVersion === null)
+    state.pendingPayload = copyData(payload);
+    if (state.pendingBaseVersion === null) {
       state.pendingBaseVersion = state.dataVersion;
-    storePending(payload, state.pendingBaseVersion);
+      state.pendingBasePayload = copyData(state.basePayload);
+    }
+    storePending(
+      state.pendingPayload,
+      state.pendingBaseVersion,
+      state.pendingBasePayload,
+    );
     if (state.conflict) {
       setCloud(
         "Conflito detectado — alterações locais preservadas",
@@ -638,18 +800,25 @@
     clearPending();
     state.pendingPayload = null;
     state.pendingBaseVersion = null;
+    state.pendingBasePayload = null;
     state.conflict = false;
     await loadSchool(state.schoolId);
   }
-  function markConflict() {
+  function markConflict(conflicts = []) {
     state.conflict = true;
+    const affected = [...new Set(conflicts)]
+      .slice(0, 2)
+      .map((item) => String(item).replace(/^settings\./, "configurações: "));
+    const detail = affected.length
+      ? ` Registro em conflito: ${affected.join(", ")}.`
+      : "";
     setCloud(
-      "Os dados foram alterados por outro usuário",
+      "Alteração simultânea precisa de revisão",
       "error",
       discardPendingAndReload,
     );
     notify(
-      "Os dados foram alterados por outro usuário. Suas alterações pendentes foram preservadas e não sobrescreveram o banco.",
+      `Outra pessoa alterou o mesmo dado ao mesmo tempo.${detail} Sua cópia local foi preservada e não sobrescreveu o banco.`,
       "warning",
       {
         sticky: true,
@@ -688,10 +857,40 @@
           );
           const confirmed = rows?.[0];
           if (!confirmed) {
-            state.pendingPayload = payload;
-            storePending(payload, expected);
-            markConflict();
-            throw new Error("Os dados foram alterados por outro usuário.");
+            const currentLocalPayload = state.pendingPayload || payload;
+            state.pendingPayload = null;
+            const merged = await mergeWithLatestData(
+              currentLocalPayload,
+              state.pendingBasePayload || state.basePayload,
+            );
+            if (merged.ok) {
+              state.pendingPayload = merged.payload;
+              state.pendingBaseVersion = Number(merged.row.version);
+              state.pendingBasePayload = copyData(merged.row.payload);
+              state.dataVersion = Number(merged.row.version);
+              state.lastChange = merged.row;
+              state.basePayload = copyData(merged.row.payload);
+              storePending(
+                merged.payload,
+                state.pendingBaseVersion,
+                state.pendingBasePayload,
+              );
+              window.GFP_APP.setData(merged.payload);
+              notify(
+                "Alterações de usuários diferentes foram unidas e salvas automaticamente.",
+                "success",
+              );
+              continue;
+            }
+            state.pendingPayload = currentLocalPayload;
+            state.pendingBaseVersion = expected;
+            storePending(
+              currentLocalPayload,
+              expected,
+              state.pendingBasePayload || state.basePayload,
+            );
+            markConflict(merged.conflicts);
+            throw new Error("Há uma alteração simultânea no mesmo cadastro.");
           }
           if (Number(confirmed.version) !== expected + 1)
             throw new Error(
@@ -700,6 +899,8 @@
           state.dataVersion = Number(confirmed.version);
           state.lastChange = confirmed;
           state.pendingBaseVersion = null;
+          state.pendingBasePayload = null;
+          state.basePayload = copyData(payload);
           clearPending();
           setCloud(formatLastChange(confirmed), "ok");
           await audit("save_school_data", "school_data", {
@@ -708,13 +909,23 @@
           });
           if (state.pendingPayload) {
             state.pendingBaseVersion = state.dataVersion;
-            storePending(state.pendingPayload, state.dataVersion);
+            state.pendingBasePayload = copyData(payload);
+            storePending(
+              state.pendingPayload,
+              state.dataVersion,
+              state.pendingBasePayload,
+            );
           }
         } catch (error) {
           if (!state.conflict) {
             state.pendingPayload = state.pendingPayload || payload;
             state.pendingBaseVersion = expected;
-            storePending(state.pendingPayload, expected);
+            state.pendingBasePayload = state.pendingBasePayload || copyData(state.basePayload);
+            storePending(
+              state.pendingPayload,
+              expected,
+              state.pendingBasePayload,
+            );
             setCloud(
               "Falha ao salvar — alterações locais preservadas",
               "error",
@@ -750,8 +961,9 @@
     await ensureSchoolReady();
     if (!canEditTasks())
       throw new Error("Seu perfil nao permite alterar tarefas.");
-    const payload = window.GFP_APP.getData();
-    payload.tasks = Array.isArray(tasks) ? tasks : [];
+    let nextTasks = copyData(Array.isArray(tasks) ? tasks : []);
+    let payload = window.GFP_APP.getData();
+    payload.tasks = nextTasks;
     if (!isTaskViewerRole()) {
       await saveNow(payload);
       return;
@@ -760,33 +972,67 @@
       throw new Error(
         "Os dados foram alterados por outro usuario. Recarregue a unidade antes de salvar tarefas.",
       );
-    const expected = Number(state.dataVersion || 0);
     state.saving = true;
     setCloud("Salvando tarefas...", "saving");
     try {
       await ensureToken();
-      const result = await rest("rpc/update_school_tasks", "", {
-        method: "POST",
-        body: {
-          target_school: state.schoolId,
-          expected_version: expected,
-          next_tasks: payload.tasks,
-        },
-      });
-      const confirmed = Array.isArray(result) ? result[0] : result;
-      if (!confirmed) {
-        markConflict();
-        throw new Error("Os dados foram alterados por outro usuario.");
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const expected = Number(state.dataVersion || 0);
+        let confirmed;
+        try {
+          const result = await rest("rpc/update_school_tasks", "", {
+            method: "POST",
+            body: {
+              target_school: state.schoolId,
+              expected_version: expected,
+              next_tasks: nextTasks,
+            },
+          });
+          confirmed = Array.isArray(result) ? result[0] : result;
+        } catch (error) {
+          if (!/alterad[oa]s? por outro usu[áa]rio/i.test(errorText(error)))
+            throw error;
+        }
+        if (confirmed) {
+          if (Number(confirmed.version) !== expected + 1)
+            throw new Error("O servidor nao confirmou a nova versao das tarefas.");
+          payload.tasks = nextTasks;
+          state.dataVersion = Number(confirmed.version);
+          state.lastChange = confirmed;
+          state.basePayload = copyData(payload);
+          setCloud(formatLastChange(confirmed), "ok");
+          try {
+            localStorage.setItem(localCacheKey(), JSON.stringify(payload));
+          } catch {}
+          window.GFP_APP.setData(payload);
+          return;
+        }
+        const row = await latestSchoolData();
+        const conflicts = [];
+        const mergedTasks = mergeDataValue(
+          state.basePayload?.tasks || [],
+          nextTasks,
+          row.payload?.tasks || [],
+          "tarefas",
+          conflicts,
+        );
+        if (conflicts.length || mergedTasks === omitMergedValue) {
+          markConflict(conflicts);
+          throw new Error("Há uma alteração simultânea na mesma tarefa.");
+        }
+        payload = copyData(row.payload);
+        payload.tasks = mergedTasks;
+        nextTasks = mergedTasks;
+        state.dataVersion = Number(row.version);
+        state.lastChange = row;
+        state.basePayload = copyData(row.payload);
+        window.GFP_APP.setData(payload);
+        notify(
+          "Alterações de tarefas foram unidas automaticamente.",
+          "success",
+        );
       }
-      if (Number(confirmed.version) !== expected + 1)
-        throw new Error("O servidor nao confirmou a nova versao das tarefas.");
-      state.dataVersion = Number(confirmed.version);
-      state.lastChange = confirmed;
-      setCloud(formatLastChange(confirmed), "ok");
-      try {
-        localStorage.setItem(localCacheKey(), JSON.stringify(payload));
-      } catch {}
-      window.GFP_APP.setData(payload);
+      throw new Error("Não foi possível concluir a sincronização das tarefas.");
     } catch (error) {
       if (!state.conflict) {
         setCloud("Falha ao salvar tarefas", "error", () => saveTasks(tasks));
