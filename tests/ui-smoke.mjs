@@ -66,9 +66,9 @@ window.eval(
 );
 
 assert.doesNotMatch(html, /Banco de horas da unidade[\s\S]*function parseTimeBankHours/, "o banco de horas não deve permanecer embutido no HTML");
-assert.match(html, /timebank\.js\?v=20260813-1/, "deve carregar o módulo de banco de horas");
+assert.match(html, /timebank\.js\?v=20260820-1/, "deve carregar o módulo de banco de horas");
 assert.doesNotMatch(html, /Versão 1\.18[\s\S]*function canonicalOccurrence/, "ocorrências e frequência não devem permanecer embutidas no HTML");
-assert.match(html, /frequency\.js\?v=20260813-1/, "deve carregar o módulo de frequência");
+assert.match(html, /frequency\.js\?v=20260820-1/, "deve carregar o módulo de frequência");
 assert.equal((html.match(/renderDashboard\s*=\s*function/g) || []).length, 1, "deve manter somente a versão ativa do painel inicial");
 assert.doesNotMatch(html, /function renderDashboard\s*\(/, "não deve manter uma implementação antiga do painel");
 assert.ok(window.document.getElementById("desktopNavToggle"), "deve oferecer controle para recolher o menu lateral");
@@ -184,6 +184,13 @@ assert.match(
   "a sequência não deve aceitar números duplicados do mesmo tipo",
 );
 window.DIB_DOCUMENTS.reset();
+documentForm.elements.number.value = "";
+window.GFP_APP.setData(window.GFP_APP.getData());
+assert.equal(
+  documentForm.elements.number.value,
+  "002/2026",
+  "o próximo memorando deve ser sugerido assim que os dados da unidade terminarem de carregar",
+);
 
 const employeeSection = window.document.getElementById("view-funcionarios");
 assert.equal(
@@ -600,6 +607,49 @@ assert.equal(
   "Licença",
   "o relatório de frequência deve exibir somente Licença, sem datas",
 );
+const frequencyPerson = window.document.getElementById("frequencyPerson");
+window.document.getElementById("frequencySource").value = "all";
+window.renderFrequencyPeople();
+frequencyPerson.value = `employee:${savedEmployee.id}`;
+window.generateFrequencyReport();
+assert.equal(
+  window.document.querySelectorAll("#frequencyPrintArea .employee-frequency tbody tr")
+    .length,
+  1,
+  "o relatório deve permitir emitir a frequência de uma única pessoa",
+);
+assert.equal(
+  window.document.querySelectorAll("#frequencyPrintArea .teacher-frequency").length,
+  0,
+  "ao escolher uma pessoa, o relatório não deve trazer outro grupo",
+);
+
+window.GFP_APP.getData().timeBank.push({
+  id: "timebank-search-entry",
+  personType: "employee",
+  personId: savedEmployee.id,
+  date: "2026-08-15",
+  hours: 1.5,
+  note: "Teste de busca",
+});
+window.GFP_APP.renderAll();
+const timeBankSearch = window.document.getElementById("timeBankSearch");
+timeBankSearch.value = "teste um";
+timeBankSearch.dispatchEvent(new window.Event("input", { bubbles: true }));
+assert.match(
+  window.document.getElementById("timeBankTable").textContent,
+  /Teste Um/,
+  "a busca do banco de horas deve filtrar a lista imediatamente",
+);
+timeBankSearch.value = "inexistente";
+timeBankSearch.dispatchEvent(new window.Event("input", { bubbles: true }));
+assert.match(
+  window.document.getElementById("timeBankTable").textContent,
+  /Nenhum lançamento encontrado/,
+  "a busca do banco de horas deve ocultar nomes fora do filtro",
+);
+timeBankSearch.value = "";
+timeBankSearch.dispatchEvent(new window.Event("input", { bubbles: true }));
 
 const systemBackupCard = window.document.getElementById("masterSystemBackup");
 assert.ok(systemBackupCard, "deve existir uma área de backup geral");
@@ -749,11 +799,11 @@ assert.doesNotMatch(
   /gfp_pending_save_/,
   "o logout não pode descartar alterações locais ainda pendentes",
 );
-assert.match(html, /online\.js\?v=20260813-1/);
-assert.match(html, /sw\.js\?v=20260813-1/);
+assert.match(html, /online\.js\?v=20260820-1/);
+assert.match(html, /sw\.js\?v=20260820-1/);
 assert.match(
   await fs.readFile(path.join(project, "sw.js"), "utf8"),
-  /online\.js\?v=20260813-1/,
+  /online\.js\?v=20260820-1/,
   "a página e o service worker devem usar a mesma versão do módulo online",
 );
 

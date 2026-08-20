@@ -127,7 +127,6 @@
         const key = localStorage.key(index) || "";
         if (key.startsWith("gfp_school_cache_")) keys.push(key);
       }
-      keys.push("gfp_last_school");
       keys.forEach((key) => localStorage.removeItem(key));
       window.GFP_APP?.clearLegacyLocalData?.();
     } catch (error) {
@@ -374,6 +373,20 @@
       return false;
     }
   }
+  function lastSchoolKey() {
+    return "gfp_last_school_" + (state.profile?.id || state.user?.id || "guest");
+  }
+  function rememberedSchoolId() {
+    try {
+      return (
+        localStorage.getItem(lastSchoolKey()) ||
+        localStorage.getItem("gfp_last_school") ||
+        ""
+      );
+    } catch {
+      return "";
+    }
+  }
   function readPending(schoolId = state.schoolId) {
     try {
       return JSON.parse(
@@ -466,7 +479,7 @@
         state.profile.system_role === "master"
           ? "master"
           : activeMembership(schoolId)?.role || "";
-      cacheLocal("gfp_last_school", schoolId);
+      cacheLocal(lastSchoolKey(), schoolId);
       const durable = readPending(schoolId);
       if (
         durable?.payload &&
@@ -960,7 +973,7 @@
       try {
         await validateRestoredSession();
         await loadIdentity();
-        const last = localStorage.getItem("gfp_last_school");
+        const last = rememberedSchoolId();
         const first =
           last && state.schools.some((s) => s.id === last)
             ? last
@@ -993,7 +1006,11 @@
       await loadIdentity();
       await showApp();
       appShown = true;
-      const first = state.schools[0]?.id;
+      const last = rememberedSchoolId();
+      const first =
+        last && state.schools.some((school) => school.id === last)
+          ? last
+          : state.schools[0]?.id;
       if (first) await loadSchool(first);
       else if (state.profile.system_role === "master") {
         setCloud("Cadastre a primeira escola", "");
@@ -1068,6 +1085,7 @@
       state.ready = false;
       if (next) await loadSchool(next.id);
       else {
+        localStorage.removeItem(lastSchoolKey());
         localStorage.removeItem("gfp_last_school");
         applyUI();
         window.GFP_APP.refreshStorageInfo();

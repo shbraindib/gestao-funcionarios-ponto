@@ -55,6 +55,8 @@ renderAll=function(){baseRenderAllTimeBank();renderTimeBankOptions();renderTimeB
 const baseSetPrintModeTimeBank=setPrintMode;
 setPrintMode=function(mode){if(mode==='timebank'){document.body.classList.remove('print-points','print-sector','print-birthday','print-registry','print-frequency','print-timebank');document.body.classList.add('print-timebank');document.getElementById('dynamicPrintPage').textContent='@media print{@page{size:A4 portrait;margin:0}}';return}document.body.classList.remove('print-timebank');baseSetPrintModeTimeBank(mode)};
 const form=document.getElementById('timeBankForm');if(form){form.addEventListener('submit',saveTimeBankEntry);const personInput=document.getElementById('timeBankPersonSearch');if(personInput){personInput.addEventListener('input',syncTimeBankPersonKey);personInput.addEventListener('change',syncTimeBankPersonKey)}}
-window.renderTimeBankReportPeople=renderTimeBankReportPeople;window.generateTimeBankReport=generateTimeBankReport;window.clearTimeBankPreview=clearTimeBankPreview;window.openTimeBankExtract=openTimeBankExtract;window.closeTimeBankExtract=closeTimeBankExtract;window.editTimeBankEntry=editTimeBankEntry;window.deleteTimeBankEntry=deleteTimeBankEntry;
+document.getElementById('timeBankSearch')?.addEventListener('input',renderTimeBankSummary);
+document.getElementById('timeBankYearFilter')?.addEventListener('change',()=>{renderTimeBankSummary();renderTimeBankReportPeople()});
+window.renderTimeBankSummary=renderTimeBankSummary;window.renderTimeBankReportPeople=renderTimeBankReportPeople;window.generateTimeBankReport=generateTimeBankReport;window.clearTimeBankPreview=clearTimeBankPreview;window.openTimeBankExtract=openTimeBankExtract;window.closeTimeBankExtract=closeTimeBankExtract;window.editTimeBankEntry=editTimeBankEntry;window.deleteTimeBankEntry=deleteTimeBankEntry;
 renderAll();resetTimeBankForm();
 })();

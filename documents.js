@@ -85,6 +85,9 @@
     form.querySelector('[type="submit"]').textContent = "Salvar documento";
     suggestNumber(true);
   }
+  function refreshSuggestedNumber() {
+    if (!form.elements.id.value) suggestNumber();
+  }
   function normalizeNumber(value, date) {
     const year = Number(date.slice(0, 4));
     if (/^\d{1,5}$/.test(clean(value))) return formatNumber(Number(value), year);
@@ -158,6 +161,7 @@
   window.GFP_APP.setData = (value) => {
     ensureDocuments(value || {});
     baseSetData(value);
+    refreshSuggestedNumber();
     render();
   };
   ensureDocuments();
@@ -179,8 +183,8 @@
     render();
     window.GFP_APP.notify("Documento salvo com sucesso.", "success");
   });
-  form.elements.type.addEventListener("change", () => suggestNumber());
-  form.elements.date.addEventListener("change", () => suggestNumber());
+  form.elements.type.addEventListener("change", refreshSuggestedNumber);
+  form.elements.date.addEventListener("change", refreshSuggestedNumber);
   document.getElementById("documentCancelEdit").addEventListener("click", resetForm);
   search.addEventListener("input", render);
   yearFilter.addEventListener("change", render);
@@ -191,7 +195,13 @@
     if (remove) deleteDocument(remove.dataset.documentDelete);
   });
 
-  window.DIB_DOCUMENTS = { render, reset: resetForm, nextNumber };
+  const baseShowViewDocuments = showView;
+  showView = function (name) {
+    baseShowViewDocuments(name);
+    if (name === "documentos") refreshSuggestedNumber();
+  };
+
+  window.DIB_DOCUMENTS = { render, reset: resetForm, nextNumber, refreshSuggestedNumber };
   resetForm();
   render();
 })();
