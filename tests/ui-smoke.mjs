@@ -69,7 +69,7 @@ assert.doesNotMatch(html, /Banco de horas da unidade[\s\S]*function parseTimeBan
 assert.match(html, /timebank\.js\?v=20260820-1/, "deve carregar o módulo de banco de horas");
 assert.doesNotMatch(html, /Versão 1\.18[\s\S]*function canonicalOccurrence/, "ocorrências e frequência não devem permanecer embutidas no HTML");
 assert.match(html, /frequency\.js\?v=20260820-2/, "deve carregar o módulo de frequência");
-assert.match(html, /online\.js\?v=20260820-2/, "deve carregar a sincronização colaborativa atualizada");
+assert.match(html, /online\.js\?v=20260820-3/, "deve carregar a sincronização colaborativa atualizada");
 assert.equal(window.document.getElementById("frequencyStart").value, "", "a data inicial da frequência deve começar em branco");
 assert.equal(window.document.getElementById("frequencyEnd").value, "", "a data final da frequência deve começar em branco");
 assert.equal(window.document.getElementById("frequencyIssueDate").value, "", "a data de emissão da frequência deve começar em branco");
@@ -94,6 +94,8 @@ for (const id of ["memorandumList", "officialLetterList"]) {
 assert.ok(window.document.getElementById("view-historico"), "deve criar a tela de histórico");
 assert.match(onlineJs, /async function auditChange/, "deve expor o registro seguro de auditoria");
 assert.match(onlineJs, /async function listAuditLogs/, "deve permitir consultar o histórico da unidade");
+assert.match(onlineJs, /function officialEventTemplate/, "novas escolas devem receber o calendário oficial como modelo");
+assert.match(onlineJs, /newSchoolDataWithOfficialCalendar\(created\)/, "o cadastro de nova escola deve usar o calendário oficial");
 assert.doesNotMatch(onlineJs, /safeDetails\.(cpf|rg|telefone|notes|observacao)/i, "a auditoria não deve copiar dados pessoais");
 window.DIB_AUDIT.record("update", "employee", "employee-1", { status: "Ativo" });
 await new Promise((resolve) => setTimeout(resolve, 0));
@@ -820,11 +822,11 @@ assert.doesNotMatch(
   /gfp_pending_save_/,
   "o logout não pode descartar alterações locais ainda pendentes",
 );
-assert.match(html, /online\.js\?v=20260820-2/);
+assert.match(html, /online\.js\?v=20260820-3/);
 assert.match(html, /sw\.js\?v=20260820-2/);
 assert.match(
   await fs.readFile(path.join(project, "sw.js"), "utf8"),
-  /online\.js\?v=20260820-2/,
+  /online\.js\?v=20260820-3/,
   "a página e o service worker devem usar a mesma versão do módulo online",
 );
 

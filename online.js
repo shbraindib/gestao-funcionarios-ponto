@@ -1085,6 +1085,39 @@
       return state.profile?.system_role === "master" && !state.preview;
     return true;
   }
+  function officialEventTemplate(payload, year = new Date().getFullYear()) {
+    const prefix = `${Number(year)}-`;
+    return (Array.isArray(payload?.events) ? payload.events : [])
+      .filter(
+        (event) =>
+          !event?.internal && String(event?.date || "").startsWith(prefix),
+      )
+      .map((event) => copyData(event));
+  }
+  async function newSchoolDataWithOfficialCalendar(school) {
+    const source = [...state.schools, ...state.adminSchools].find(
+      (item, index, list) =>
+        list.findIndex((candidate) => candidate.id === item.id) === index &&
+        String(item.name || "").toLocaleLowerCase("pt-BR") ===
+          "e.m. júlio da silva",
+    );
+    if (!source?.id)
+      throw new Error(
+        "Não foi possível localizar a E.M. Júlio da Silva como modelo do calendário oficial.",
+      );
+    const rows = await rest(
+      "school_data",
+      `select=payload&school_id=eq.${q(source.id)}`,
+    );
+    const events = officialEventTemplate(rows?.[0]?.payload);
+    if (!events.length)
+      throw new Error(
+        "O calendário oficial do ano ainda não está cadastrado na E.M. Júlio da Silva.",
+      );
+    const payload = window.GFP_APP.createEmptyData(school);
+    payload.events = events;
+    return payload;
+  }
   function isReadOnly() {
     return Boolean(state.preview) || isTaskViewerRole();
   }
@@ -1386,7 +1419,7 @@
           headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
           body: {
             school_id: created.id,
-            payload: window.GFP_APP.createEmptyData(created),
+            payload: await newSchoolDataWithOfficialCalendar(created),
           },
         });
       }
@@ -1396,13 +1429,13 @@
         "schoolAdminMessage",
         editing
           ? "Escola atualizada com sucesso."
-          : "Escola cadastrada vazia com sucesso.",
+          : "Escola cadastrada com o calendário oficial do ano.",
         "ok",
       );
       notify(
         editing
           ? "Escola atualizada com sucesso."
-          : "Escola cadastrada vazia com sucesso.",
+          : "Escola cadastrada com o calendário oficial do ano.",
         "success",
       );
     } catch (err) {
