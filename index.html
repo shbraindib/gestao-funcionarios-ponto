@@ -410,7 +410,7 @@ async function clearSchoolData(){
 renderAll();refreshStorageInfo();
 if(location.search.includes('preview=1')){document.getElementById('genMonth').value=6;document.getElementById('genYear').value=2026;document.getElementById('genType').value='all';showView('gerar');renderSelection();setTimeout(generatePreview,50)}else if(location.search.includes('preview=sectors')){showView('relatorios');setTimeout(generateSectorReport,50)}else if(location.search.includes('preview=birthdays')){showView('relatorios');document.getElementById('birthdayMonth').value=6;setTimeout(generateBirthdayReport,50)}else if(location.search.includes('preview=registry-employees')){setTimeout(()=>printCompleteRegistry('employee'),50)}else if(location.search.includes('preview=registry-teachers')){setTimeout(()=>printCompleteRegistry('teacher'),50)}
 </script>
-<script src="frequency.js?v=20260820-1"></script>
+<script src="frequency.js?v=20260820-2"></script>
 
 <script src="timebank.js?v=20260820-1"></script>
 
@@ -471,14 +471,14 @@ window.GFP_APP={
 };
 </script>
 <script src="enhancements.js?v=20260813-1"></script>
-<script src="documents.js?v=20260820-1"></script>
+<script src="documents.js?v=20260820-2"></script>
 <script src="exports.js?v=20260813-1"></script>
 <script src="inconsistencies.js?v=20260813-1"></script>
 <script src="online.js?v=20260820-1"></script>
 <script src="audit.js?v=20260813-1"></script>
 <script>
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=20260820-1',{updateViaCache:'none'}).catch(() => {}));
+  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js?v=20260820-2',{updateViaCache:'none'}).catch(() => {}));
 }
 </script>
 </body></html>

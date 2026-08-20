@@ -113,7 +113,15 @@
       .filter((item) => item.type === type)
       .filter((item) => year === "all" || item.date?.startsWith(year))
       .filter((item) => !query || [item.number, item.requester, item.recipient, item.subject, item.status].some((value) => fold(value).includes(query)))
-      .sort((a, b) => clean(b.date).localeCompare(clean(a.date)) || clean(b.number).localeCompare(clean(a.number), "pt-BR", { numeric: true }));
+      .sort((a, b) => {
+        const aNumber = numberParts(a.number);
+        const bNumber = numberParts(b.number);
+        return (
+          (bNumber?.year || 0) - (aNumber?.year || 0) ||
+          (bNumber?.sequence || 0) - (aNumber?.sequence || 0) ||
+          clean(b.date).localeCompare(clean(a.date))
+        );
+      });
   }
   function statusClass(status) {
     return `status-${fold(status).replace(/[^a-z0-9]+/g, "-")}`;

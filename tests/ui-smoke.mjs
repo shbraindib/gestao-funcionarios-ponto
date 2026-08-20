@@ -68,7 +68,10 @@ window.eval(
 assert.doesNotMatch(html, /Banco de horas da unidade[\s\S]*function parseTimeBankHours/, "o banco de horas não deve permanecer embutido no HTML");
 assert.match(html, /timebank\.js\?v=20260820-1/, "deve carregar o módulo de banco de horas");
 assert.doesNotMatch(html, /Versão 1\.18[\s\S]*function canonicalOccurrence/, "ocorrências e frequência não devem permanecer embutidas no HTML");
-assert.match(html, /frequency\.js\?v=20260820-1/, "deve carregar o módulo de frequência");
+assert.match(html, /frequency\.js\?v=20260820-2/, "deve carregar o módulo de frequência");
+assert.equal(window.document.getElementById("frequencyStart").value, "", "a data inicial da frequência deve começar em branco");
+assert.equal(window.document.getElementById("frequencyEnd").value, "", "a data final da frequência deve começar em branco");
+assert.equal(window.document.getElementById("frequencyIssueDate").value, "", "a data de emissão da frequência deve começar em branco");
 assert.equal((html.match(/renderDashboard\s*=\s*function/g) || []).length, 1, "deve manter somente a versão ativa do painel inicial");
 assert.doesNotMatch(html, /function renderDashboard\s*\(/, "não deve manter uma implementação antiga do painel");
 assert.ok(window.document.getElementById("desktopNavToggle"), "deve oferecer controle para recolher o menu lateral");
@@ -190,6 +193,23 @@ assert.equal(
   documentForm.elements.number.value,
   "002/2026",
   "o próximo memorando deve ser sugerido assim que os dados da unidade terminarem de carregar",
+);
+window.GFP_APP.getData().documents.push({
+  id: "memorandum-order-test",
+  type: "memorandum",
+  number: "010/2026",
+  date: "2026-01-01",
+  requester: "Direção",
+  recipient: "Secretaria",
+  subject: "Memorando de maior número",
+  status: "Rascunho",
+  notes: "",
+});
+window.DIB_DOCUMENTS.render();
+assert.equal(
+  window.document.querySelector("#memorandumList .document-number").textContent,
+  "010/2026",
+  "os memorandos devem ser listados pelo maior número, independentemente da data",
 );
 
 const employeeSection = window.document.getElementById("view-funcionarios");
@@ -800,7 +820,7 @@ assert.doesNotMatch(
   "o logout não pode descartar alterações locais ainda pendentes",
 );
 assert.match(html, /online\.js\?v=20260820-1/);
-assert.match(html, /sw\.js\?v=20260820-1/);
+assert.match(html, /sw\.js\?v=20260820-2/);
 assert.match(
   await fs.readFile(path.join(project, "sw.js"), "utf8"),
   /online\.js\?v=20260820-1/,
