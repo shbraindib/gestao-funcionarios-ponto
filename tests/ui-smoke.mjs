@@ -66,7 +66,7 @@ window.eval(
 );
 
 assert.doesNotMatch(html, /Banco de horas da unidade[\s\S]*function parseTimeBankHours/, "o banco de horas não deve permanecer embutido no HTML");
-assert.match(html, /timebank\.js\?v=20260820-1/, "deve carregar o módulo de banco de horas");
+assert.match(html, /timebank\.js\?v=20260821-1/, "deve carregar o módulo de banco de horas");
 assert.doesNotMatch(html, /Versão 1\.18[\s\S]*function canonicalOccurrence/, "ocorrências e frequência não devem permanecer embutidas no HTML");
 assert.match(html, /frequency\.js\?v=20260820-2/, "deve carregar o módulo de frequência");
 assert.match(html, /online\.js\?v=20260820-3/, "deve carregar a sincronização colaborativa atualizada");
@@ -340,6 +340,7 @@ archiveButton.dispatchEvent(
 const savedEmployee = window.GFP_APP.getData().employees.find(
   (item) => item.matricula === "MAT-001",
 );
+savedEmployee.jornada = "30";
 const absenceForm = window.document.getElementById("absenceForm");
 absenceForm.elements.personKey.value = `employee:${savedEmployee.id}`;
 absenceForm.elements.tipo.value = "LICENÇA";
@@ -655,6 +656,14 @@ window.GFP_APP.getData().timeBank.push({
   hours: 1.5,
   note: "Teste de busca",
 });
+window.GFP_APP.getData().timeBank.push({
+  id: "timebank-day-equivalent",
+  personType: "employee",
+  personId: savedEmployee.id,
+  date: "2026-08-16",
+  hours: 6,
+  note: "Teste de equivalência",
+});
 window.GFP_APP.renderAll();
 const timeBankSearch = window.document.getElementById("timeBankSearch");
 timeBankSearch.value = "teste um";
@@ -673,6 +682,18 @@ assert.match(
 );
 timeBankSearch.value = "";
 timeBankSearch.dispatchEvent(new window.Event("input", { bubbles: true }));
+window.openTimeBankExtract("employee", savedEmployee.id);
+assert.match(
+  window.document.getElementById("timeBankExtractSummary").textContent,
+  /1 dia equivale a 6h \(jornada de 30h semanais\)/,
+  "a equivalência deve usar a jornada semanal individual",
+);
+assert.match(
+  window.document.getElementById("timeBankExtractContent").textContent,
+  /1 dia e 1h30/,
+  "6h devem corresponder a um dia para jornada semanal de 30h",
+);
+window.closeTimeBankExtract();
 
 const systemBackupCard = window.document.getElementById("masterSystemBackup");
 assert.ok(systemBackupCard, "deve existir uma área de backup geral");
