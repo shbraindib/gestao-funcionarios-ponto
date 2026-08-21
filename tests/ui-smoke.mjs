@@ -66,8 +66,12 @@ window.eval(
 );
 
 assert.doesNotMatch(html, /Banco de horas da unidade[\s\S]*function parseTimeBankHours/, "o banco de horas não deve permanecer embutido no HTML");
-assert.match(html, /timebank\.js\?v=20260821-2/, "deve carregar o módulo de banco de horas");
+assert.match(html, /timebank\.js\?v=20260821-3/, "deve carregar o módulo de banco de horas");
+assert.match(html, /sw\.js\?v=20260821-3/, "deve solicitar imediatamente a correção responsiva mais recente");
 assert.match(html, /@media\(max-width:1180px\)/, "tablets e notebooks compactos devem usar o menu recolhível");
+assert.match(html, /@media\(max-width:1180px\)\{\.desktop-nav-toggle\{display:none\}/, "o botão do menu de desktop deve desaparecer no iPad");
+assert.match(html, /setMobileNavigation\(open\).*?max-width:1180px/s, "o botão compacto deve controlar o menu no iPad");
+assert.doesNotMatch(html, /matchMedia\('\(max-width:980px\)'\)/, "todos os controles de navegação devem usar o mesmo limite responsivo");
 assert.match(html, /@media\(max-width:1260px\).*home-task-form/s, "o painel deve compactar controles em telas intermediárias");
 assert.doesNotMatch(html, /Versão 1\.18[\s\S]*function canonicalOccurrence/, "ocorrências e frequência não devem permanecer embutidas no HTML");
 assert.match(html, /frequency\.js\?v=20260820-2/, "deve carregar o módulo de frequência");
@@ -86,6 +90,7 @@ assert.ok(window.document.getElementById("deleteEventBtn"), "deve oferecer exclu
 assert.match(timebankJs, /closeTimeBankExtract\(\);const ok=await/, "deve fechar o extrato antes de abrir a confirmação");
 assert.match(html, /activeTeachers=data\.teachers\.filter\(t=>isActive\(t\)&&!isSubstitute\(t\)\)/, "o card deve desconsiderar professores substitutos");
 assert.match(timebankJs, /jornada semanal de cada servidor/, "deve exibir a principal novidade do banco de horas");
+assert.match(timebankJs, /tela inicial e o menu foram adaptados para iPad/, "deve comunicar a melhoria de navegação em telas compactas");
 assert.equal(window.document.querySelector('#documentForm [name="requester"]').closest("label").firstChild.nodeValue, "Remetente", "o cadastro de documentos deve usar Remetente");
 for (const id of ["memorandumList", "officialLetterList"]) {
   const list = window.document.getElementById(id);
@@ -846,7 +851,7 @@ assert.doesNotMatch(
   "o logout não pode descartar alterações locais ainda pendentes",
 );
 assert.match(html, /online\.js\?v=20260820-3/);
-assert.match(html, /sw\.js\?v=20260821-2/);
+assert.match(html, /sw\.js\?v=20260821-3/);
 assert.match(
   await fs.readFile(path.join(project, "sw.js"), "utf8"),
   /online\.js\?v=20260820-3/,
